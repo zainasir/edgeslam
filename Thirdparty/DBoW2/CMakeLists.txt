@@ -1,6 +1,13 @@
 cmake_minimum_required(VERSION 2.8)
 project(DBoW2)
 
+# Edge-SLAM: fix "Policy CMP0012 is not set: if() recognizes numbers and boolean constants." warning
+if(${CMAKE_VERSION} VERSION_GREATER_EQUAL "3.0")
+  if(POLICY CMP0012)
+    cmake_policy(SET CMP0012 NEW)
+  endif()
+endif()
+
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS}  -Wall  -O3 -march=native ")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall  -O3 -march=native")
 

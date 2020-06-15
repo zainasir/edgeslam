@@ -3,6 +3,13 @@ SET(CMAKE_LEGACY_CYGWIN_WIN32 0)
 
 PROJECT(g2o)
 
+# Edge-SLAM: fix "Policy CMP0012 is not set: if() recognizes numbers and boolean constants." warning
+if(${CMAKE_VERSION} VERSION_GREATER_EQUAL "3.0")
+  if(POLICY CMP0012)
+    cmake_policy(SET CMP0012 NEW)
+  endif()
+endif()
+
 SET(g2o_C_FLAGS)
 SET(g2o_CXX_FLAGS)
 
