@@ -2,7 +2,9 @@
 
 ## ORB-SLAM2 version 1.0 and Edge-SLAM version 1.0
 
-In this document we list all the pieces of code included by ORB-SLAM2, Edge-SLAM, and linked libraries which are not property of the authors of ORB-SLAM2 and the authors of Edge-SLAM.
+In this document we list all the pieces of code included by ORB-SLAM2,
+Edge-SLAM, and linked libraries which are not property of the authors of
+ORB-SLAM2 and the authors of Edge-SLAM.
 
 ### Code in **src** and **include** folders
 
