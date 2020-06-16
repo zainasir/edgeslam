@@ -37,6 +37,37 @@ void Map::AddKeyFrame(KeyFrame *pKF)
         mnMaxKFid=pKF->mnId;
 }
 
+// Edge-SLAM
+KeyFrame* Map::RetrieveKeyFrame(long int id)
+{
+    if(id >= 0)
+    {
+        for(set<KeyFrame*>::iterator sit=mspKeyFrames.begin(), send=mspKeyFrames.end(); sit!=send; sit++)
+        {
+            if ((*sit)->mnId == (unsigned)id)
+                return *sit;
+        }
+    }
+
+    return NULL;
+}
+
+// Edge-SLAM
+MapPoint* Map::RetrieveMapPoint(long int id, bool isTracking)
+{
+    if(id >= 0)
+    {
+        for(set<MapPoint*>::iterator sit=mspMapPoints.begin(), send=mspMapPoints.end(); sit!=send; sit++)
+        {
+            unsigned long int current_id = (isTracking)?(*sit)->mnId:(*sit)->lmMnId;
+            if (current_id == (unsigned)id)
+                return *sit;
+        }
+    }
+
+    return NULL;
+}
+
 void Map::AddMapPoint(MapPoint *pMP)
 {
     unique_lock<mutex> lock(mMutexMap);
@@ -46,6 +77,8 @@ void Map::AddMapPoint(MapPoint *pMP)
 void Map::EraseMapPoint(MapPoint *pMP)
 {
     unique_lock<mutex> lock(mMutexMap);
+
+    // This only erase the pointer
     mspMapPoints.erase(pMP);
 
     // TODO: This only erase the pointer.
@@ -55,10 +88,12 @@ void Map::EraseMapPoint(MapPoint *pMP)
 void Map::EraseKeyFrame(KeyFrame *pKF)
 {
     unique_lock<mutex> lock(mMutexMap);
+
+    // This only erase the pointer
     mspKeyFrames.erase(pKF);
 
     // TODO: This only erase the pointer.
-    // Delete the MapPoint
+    // Delete the KeyFrame
 }
 
 void Map::SetReferenceMapPoints(const vector<MapPoint *> &vpMPs)

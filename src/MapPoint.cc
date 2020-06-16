@@ -29,25 +29,42 @@ namespace ORB_SLAM2
 long unsigned int MapPoint::nNextId=0;
 mutex MapPoint::mGlobalMutex;
 
-MapPoint::MapPoint(const cv::Mat &Pos, KeyFrame *pRefKF, Map* pMap):
+// Edge-SLAM: added wchThread variable
+MapPoint::MapPoint(const cv::Mat &Pos, KeyFrame *pRefKF, Map* pMap, int wchThread):
     mnFirstKFid(pRefKF->mnId), mnFirstFrame(pRefKF->mnFrameId), nObs(0), mnTrackReferenceForFrame(0),
     mnLastFrameSeen(0), mnBALocalForKF(0), mnFuseCandidateForKF(0), mnLoopPointForKF(0), mnCorrectedByKF(0),
     mnCorrectedReference(0), mnBAGlobalForKF(0), mpRefKF(pRefKF), mnVisible(1), mnFound(1), mbBad(false),
-    mpReplaced(static_cast<MapPoint*>(NULL)), mfMinDistance(0), mfMaxDistance(0), mpMap(pMap)
+    mpReplaced(static_cast<MapPoint*>(NULL)), mfMinDistance(0), mfMaxDistance(0), mpMap(pMap), whichThread(wchThread)
 {
     Pos.copyTo(mWorldPos);
     mNormalVector = cv::Mat::zeros(3,1,CV_32F);
 
     // MapPoints can be created from Tracking and Local Mapping. This mutex avoid conflicts with id.
     unique_lock<mutex> lock(mpMap->mMutexPointCreation);
-    mnId=nNextId++;
+
+    // Edge-SLAM: set mappoint id based on the thread creating the object
+    if(wchThread == 1)  // Tracking
+    {
+        mnId=nNextId++;
+        trSet=true;
+        lmMnId=0;
+        lmSet=false;
+    }
+    else if (wchThread == 2)    // Local-mapping
+    {
+        lmMnId=nNextId++;
+        lmSet=true;
+        mnId=0;
+        trSet=false;
+    }
 }
 
-MapPoint::MapPoint(const cv::Mat &Pos, Map* pMap, Frame* pFrame, const int &idxF):
+// Edge-SLAM: added wchThread variable
+MapPoint::MapPoint(const cv::Mat &Pos, Map* pMap, Frame* pFrame, const int &idxF, int wchThread):
     mnFirstKFid(-1), mnFirstFrame(pFrame->mnId), nObs(0), mnTrackReferenceForFrame(0), mnLastFrameSeen(0),
     mnBALocalForKF(0), mnFuseCandidateForKF(0),mnLoopPointForKF(0), mnCorrectedByKF(0),
     mnCorrectedReference(0), mnBAGlobalForKF(0), mpRefKF(static_cast<KeyFrame*>(NULL)), mnVisible(1),
-    mnFound(1), mbBad(false), mpReplaced(NULL), mpMap(pMap)
+    mnFound(1), mbBad(false), mpReplaced(NULL), mpMap(pMap), whichThread(wchThread)
 {
     Pos.copyTo(mWorldPos);
     cv::Mat Ow = pFrame->GetCameraCenter();
@@ -67,13 +84,66 @@ MapPoint::MapPoint(const cv::Mat &Pos, Map* pMap, Frame* pFrame, const int &idxF
 
     // MapPoints can be created from Tracking and Local Mapping. This mutex avoid conflicts with id.
     unique_lock<mutex> lock(mpMap->mMutexPointCreation);
-    mnId=nNextId++;
+
+    // Edge-SLAM: set mappoint id based on the thread creating the object
+    if(wchThread == 1)  // Tracking
+    {
+        mnId=nNextId++;
+        trSet=true;
+        lmMnId=0;
+        lmSet=false;
+    }
+    else if (wchThread == 2)    // Local-mapping
+    {
+        lmMnId=nNextId++;
+        lmSet=true;
+        mnId=0;
+        trSet=false;
+    }
+}
+
+// Edge-SLAM: check and set mappoint fields after deserialization
+void MapPoint::AssignId(bool isTracking)
+{
+    if(isTracking && trSet==false)
+    {
+        mnId=nNextId++;
+        trSet=true;
+        whichThread=1;
+    }
+    else if(!isTracking && lmSet==false)
+    {
+        lmMnId=nNextId++;
+        lmSet=true;
+        whichThread=2;
+    }
+    else
+    {
+        if(isTracking)
+            whichThread=1;
+        else
+            whichThread=2;
+    }
+}
+
+// Edge-SLAM: retrieve id based on working thread
+long unsigned int MapPoint::GetId()
+{
+    if(whichThread==1)
+    {
+        return mnId;
+    }
+    else //if(whichThread==2)
+    {
+        return lmMnId;
+    }
 }
 
 void MapPoint::SetWorldPos(const cv::Mat &Pos)
 {
     unique_lock<mutex> lock2(mGlobalMutex);
     unique_lock<mutex> lock(mMutexPos);
+
     Pos.copyTo(mWorldPos);
 }
 
@@ -95,12 +165,24 @@ KeyFrame* MapPoint::GetReferenceKeyFrame()
     return mpRefKF;
 }
 
+// Edge-SLAM
+void MapPoint::SetReferenceKeyFrame(KeyFrame* ref)
+{
+    unique_lock<mutex> lock(mMutexFeatures);
+    mpRefKF = ref;
+}
+
 void MapPoint::AddObservation(KeyFrame* pKF, size_t idx)
 {
     unique_lock<mutex> lock(mMutexFeatures);
     if(mObservations.count(pKF))
         return;
     mObservations[pKF]=idx;
+
+    // Edge-SLAM
+    if(mObservations_id.count(pKF->mnId)) //since nobs is delivered, we don't want to alter the value if its id is in mObservations_id
+        return;
+    mObservations_id[pKF->mnId]=idx;
 
     if(pKF->mvuRight[idx]>=0)
         nObs+=2;
@@ -123,8 +205,17 @@ void MapPoint::EraseObservation(KeyFrame* pKF)
 
             mObservations.erase(pKF);
 
+            // Edge-SLAM
+            mObservations_id.erase(pKF->mnId);
+
             if(mpRefKF==pKF)
+            {
                 mpRefKF=mObservations.begin()->first;
+
+                // Edge-SLAM
+                if (mpRefKF)
+                    mnFirstKFid = mpRefKF->mnId;
+            }
 
             // If only 2 observations or less, discard point
             if(nObs<=2)
@@ -157,6 +248,9 @@ void MapPoint::SetBadFlag()
         mbBad=true;
         obs = mObservations;
         mObservations.clear();
+
+        // Edge-SLAM
+        mObservations_id.clear();
     }
     for(map<KeyFrame*,size_t>::iterator mit=obs.begin(), mend=obs.end(); mit!=mend; mit++)
     {
@@ -176,7 +270,9 @@ MapPoint* MapPoint::GetReplaced()
 
 void MapPoint::Replace(MapPoint* pMP)
 {
-    if(pMP->mnId==this->mnId)
+    // Edge-SLAM
+    if (((whichThread==1) && (pMP->GetId()==this->mnId)) || ((whichThread==2) && (pMP->GetId()==this->lmMnId)))
+    //if(pMP->mnId==this->mnId)
         return;
 
     int nvisible, nfound;
@@ -186,6 +282,10 @@ void MapPoint::Replace(MapPoint* pMP)
         unique_lock<mutex> lock2(mMutexPos);
         obs=mObservations;
         mObservations.clear();
+
+        // Edge-SLAM
+        mObservations_id.clear();
+
         mbBad=true;
         nvisible = mnVisible;
         nfound = mnFound;
@@ -325,6 +425,13 @@ bool MapPoint::IsInKeyFrame(KeyFrame *pKF)
 {
     unique_lock<mutex> lock(mMutexFeatures);
     return (mObservations.count(pKF));
+}
+
+// Edge-SLAM
+bool MapPoint::IsInKeyFrame(long int id)
+{
+    unique_lock<mutex> lock(mMutexFeatures);
+    return (mObservations_id.count(id));
 }
 
 void MapPoint::UpdateNormalAndDepth()

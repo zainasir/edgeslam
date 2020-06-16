@@ -27,11 +27,147 @@
 
 namespace ORB_SLAM2
 {
+// Edge-SLAM: measure
+std::chrono::high_resolution_clock::time_point LocalMapping::msLastMUStart = std::chrono::high_resolution_clock::now();
+std::chrono::high_resolution_clock::time_point LocalMapping::msLastMUStop;
 
-LocalMapping::LocalMapping(Map *pMap, const float bMonocular):
-    mbMonocular(bMonocular), mbResetRequested(false), mbFinishRequested(false), mbFinished(true), mpMap(pMap),
+// Edge-SLAM: map update variables
+const int LocalMapping::MAP_FREQ=5000;
+const int LocalMapping::KF_NUM=6;
+const int LocalMapping::CONN_KF=2;
+bool LocalMapping::msNewKFFlag=false;
+stack<long unsigned int> LocalMapping::msLatestKFsId;
+
+// Edge-SLAM: relocalization
+vector<KeyFrame*> LocalMapping::vpCandidateKFs;
+unordered_set<long unsigned int> LocalMapping::usCandidateKFsId;
+bool LocalMapping::msRelocStatus=false;
+bool LocalMapping::msRelocNewFFlag=false;
+const int LocalMapping::RELOC_FREQ=5000;
+
+// Edge-SLAM: added settings file path variable
+LocalMapping::LocalMapping(Map *pMap, KeyFrameDatabase* pKFDB, ORBVocabulary* pVoc, const string &strSettingPath, const float bMonocular):
+    mbMonocular(bMonocular), mbResetRequested(false), mbFinishRequested(false), mbFinished(true), mpORBVocabulary(pVoc), mpMap(pMap), mpKeyFrameDB(pKFDB),
     mbAbortBA(false), mbStopped(false), mbStopRequested(false), mbNotStop(false), mbAcceptKeyFrames(true)
 {
+    // Edge-SLAM: everything in this scope is new
+
+    // Load camera parameters from settings file
+    cv::FileStorage fSettings(strSettingPath, cv::FileStorage::READ);
+    float fps = fSettings["Camera.fps"];
+    if(fps==0)
+        fps=30;
+    // Max/Min Frames to insert keyframes and to check relocalisation
+    mMinFrames = 0;
+    mMaxFrames = fps;
+
+    // Setting up connections
+    string ip;
+    string port_number;
+    cout << "Enter the device IP address: ";
+    getline(cin, ip);
+    // Keyframe connection
+    cout << "Enter the port number used for keyframe connection: ";
+    getline(cin, port_number);
+    keyframe_socket = new TcpSocket(ip, std::stoi(port_number));
+    keyframe_socket->waitForConnection();
+    keyframe_thread = new thread(&ORB_SLAM2::LocalMapping::tcp_receive, &keyframe_queue, keyframe_socket, 2, "keyframe");
+    // Frame connection
+    cout << "Enter the port number used for frame connection: ";
+    getline(cin, port_number);
+    frame_socket = new TcpSocket(ip, std::stoi(port_number));
+    frame_socket->waitForConnection();
+    frame_thread = new thread(&ORB_SLAM2::LocalMapping::tcp_receive, &frame_queue, frame_socket, 1, "frame");
+    // Map connection
+    cout << "Enter the port number used for map connection: ";
+    getline(cin, port_number);
+    map_socket = new TcpSocket(ip, std::stoi(port_number));
+    map_socket->waitForConnection();
+    map_thread = new thread(&ORB_SLAM2::LocalMapping::tcp_send, &map_queue, map_socket, "map");
+
+    mnLastKeyFrameId = 0;
+
+    cout << "log,LocalMapping::LocalMapping,done" << endl;
+}
+
+// Edge-SLAM
+void LocalMapping::keyframeCallback(const std::string& msg)
+{
+    // If Local Mapping is freezed by a Loop Closure do not insert keyframes
+    if(isStopped() || stopRequested())
+        return;
+
+    // If system reset is in process, then return
+    if(CheckReset())
+        return;
+
+    // Moved from CreateNewKeyFrame() function in tracking thread on client
+    if(!SetNotStop(true))
+        return;
+
+    KeyFrame *tKF = new KeyFrame();
+    try
+    {
+        std::stringstream iis(msg);
+        boost::archive::text_iarchive iia(iis);
+        iia >> tKF;
+    }
+    catch(boost::archive::archive_exception e)
+    {
+        cout << "log,LocalMapping::keyframeCallback,error: " << e.what() << endl;
+        SetNotStop(false);
+        return;
+    }
+
+    // Check for reset signal from client
+    if(tKF->GetResetKF() || (tKF->mnFrameId < mnLastKeyFrameId))
+    {
+        cout << "log,LocalMapping::keyframeCallback,received reset signal from client with keyframe " << tKF->mnId << endl;
+
+        RequestReset();
+        SetNotStop(false);
+        return;
+    }
+
+    tKF->setORBVocab(mpORBVocabulary);
+    tKF->setMapPointer(mpMap);
+    tKF->setKeyFrameDatabase(mpKeyFrameDB);
+
+    // Check keyframe after receiving it from the client
+    // If first received keyframe then insert without additional checking
+    if ((tKF->mnId < 1) || (mpMap->KeyFramesInMap() < 1))
+    {
+        tKF->ChangeParent(NULL);
+        InsertKeyFrame(tKF);
+        mpMap->mvpKeyFrameOrigins.push_back(tKF);
+        msLatestKFsId.push(tKF->mnId);
+        mnLastKeyFrameId = tKF->mnFrameId;
+
+        msNewKFFlag = true;
+
+        cout << "log,LocalMapping::keyframeCallback,accepted initial keyframe " << tKF->mnId << endl;
+    }
+    else
+    {
+        if(NeedNewKeyFrame(tKF))
+        {
+            InsertKeyFrame(tKF);
+            msLatestKFsId.push(tKF->mnId);
+            mnLastKeyFrameId = tKF->mnFrameId;
+
+            msNewKFFlag = true;
+
+            cout << "log,LocalMapping::keyframeCallback,accepted keyframe " << tKF->mnId << endl;
+        }
+        else
+            cout << "log,LocalMapping::keyframeCallback,dropped keyframe " << tKF->mnId << endl;
+    }
+
+    // Set relocalization variables
+    msRelocStatus = false;
+    msRelocNewFFlag = false;
+
+    SetNotStop(false);
 }
 
 void LocalMapping::SetLoopCloser(LoopClosing* pLoopCloser)
@@ -39,18 +175,75 @@ void LocalMapping::SetLoopCloser(LoopClosing* pLoopCloser)
     mpLoopCloser = pLoopCloser;
 }
 
+// Edge-SLAM: disabled
+/*
 void LocalMapping::SetTracker(Tracking *pTracker)
 {
     mpTracker=pTracker;
 }
+*/
+
+// Edge-SLAM
+void LocalMapping::Reset()
+{
+    /* Edge-SLAM: disabled because viewer is disabled on server
+    cout << "System Reseting" << endl;
+    if(mpViewer)
+    {
+        mpViewer->RequestStop();
+        while(!mpViewer->isStopped())
+            usleep(3000);
+    }*/
+
+    // Reset Loop Closing
+    cout << "Reseting Loop Closing...";
+    mpLoopCloser->RequestReset();
+    cout << " done" << endl;
+
+    // Clear BoW Database
+    cout << "Reseting Database...";
+    mpKeyFrameDB->clear();
+    cout << " done" << endl;
+
+    // Clear Map (this erase MapPoints and KeyFrames)
+    mpMap->clear();
+
+    KeyFrame::nNextId = 0;
+    Frame::nNextId = 0;
+
+    /* Edge-SLAM: disabled because viewer is disabled on server
+    if(mpViewer)
+        mpViewer->Release();*/
+}
 
 void LocalMapping::Run()
 {
-
     mbFinished = false;
 
     while(1)
     {
+        // Edge-SLAM: check if there is a new keyframe received, if not, then check if a frame is received for relocalization
+        {
+            string msg;
+            if(keyframe_queue.try_dequeue(msg))
+            {
+                // If relocalization was successful and a new keyframe is received, then drop any remaining relocalization frames in queue
+                if(msRelocStatus)
+                {
+                    string data;
+                    if(frame_queue.try_dequeue(data))
+                    {
+                        data.clear();
+                    }
+                }
+                keyframeCallback(msg);
+            }
+            else if(frame_queue.try_dequeue(msg))
+            {
+                frameCallback(msg);
+            }
+        }
+
         // Tracking will see that Local Mapping is busy
         SetAcceptKeyFrames(false);
 
@@ -59,6 +252,13 @@ void LocalMapping::Run()
         {
             // BoW conversion and insertion in Map
             ProcessNewKeyFrame();
+
+            // Edge-SLAM: check if new keyframe is received
+            {
+                string msg;
+                if(keyframe_queue.try_dequeue(msg))
+                    keyframeCallback(msg);
+            }
 
             // Check recent MapPoints
             MapPointCulling();
@@ -85,6 +285,9 @@ void LocalMapping::Run()
             }
 
             mpLoopCloser->InsertKeyFrame(mpCurrentKeyFrame);
+
+            // Edge-SLAM: debug
+            cout << "log,LocalMapping::Run,map has " << mpMap->MapPointsInMap() << " mappoints and " << mpMap->KeyFramesInMap() << " keyframes" << endl;
         }
         else if(Stop())
         {
@@ -97,9 +300,30 @@ void LocalMapping::Run()
                 break;
         }
 
+        // Edge-SLAM: create and send local-map update
+        // Edge-SLAM: added curly brackets (block) to limit measurement variables scope
+        {
+            // Edge-SLAM: measure
+            // Edge-SLAM: check how long it has been since last map update
+            msLastMUStop = std::chrono::high_resolution_clock::now();
+            auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(msLastMUStop - msLastMUStart);
+            auto dCount = duration.count();
+
+            // Send relocalization map
+            if ((dCount > RELOC_FREQ) && (mpMap->KeyFramesInMap() > 0) && (msRelocStatus) && (msRelocNewFFlag) && (!CheckReset()))
+            {
+                sendRelocMapUpdate();
+            }
+            // Send regular local map update
+            else if ((dCount > MAP_FREQ) && (mpMap->KeyFramesInMap() > 0) && (msNewKFFlag) && (!CheckReset()))
+            {
+                sendLocalMapUpdate();
+            }
+        }
+
         ResetIfRequested();
 
-        // Tracking will see that Local Mapping is busy
+        // Tracking will see that Local Mapping is free
         SetAcceptKeyFrames(true);
 
         if(CheckFinish())
@@ -116,6 +340,9 @@ void LocalMapping::InsertKeyFrame(KeyFrame *pKF)
     unique_lock<mutex> lock(mMutexNewKFs);
     mlNewKeyFrames.push_back(pKF);
     mbAbortBA=true;
+
+    // Edge-SLAM: debug
+    cout << "log,LocalMapping::InsertKeyFrame,queue size " << mlNewKeyFrames.size() << endl;
 }
 
 
@@ -146,19 +373,67 @@ void LocalMapping::ProcessNewKeyFrame()
         {
             if(!pMP->isBad())
             {
-                if(!pMP->IsInKeyFrame(mpCurrentKeyFrame))
+                // Edge-SLAM: since we are not sending mObservations and pRefKF due to being pointers, we should take care of their adjustment
+
+                // Edge-SLAM: set mappoint refKF
+                if ((unsigned)pMP->mnFirstKFid != mpCurrentKeyFrame->mnId)
                 {
-                    pMP->AddObservation(mpCurrentKeyFrame, i);
-                    pMP->UpdateNormalAndDepth();
-                    pMP->ComputeDistinctiveDescriptors();
+                    KeyFrame* pRefKF = mpMap->RetrieveKeyFrame(pMP->mnFirstKFid);
+                    if(pRefKF)
+                    {
+                        pMP->SetReferenceKeyFrame(pRefKF);
+                    }
+                    else
+                    {
+                        pMP->SetReferenceKeyFrame(static_cast<KeyFrame*>(NULL));
+                    }
+                }
+                else
+                {
+                    pMP->SetReferenceKeyFrame(mpCurrentKeyFrame);
+                }
+
+                // Edge-SLAM
+                // This if condition corresponds to map points that have been sent previously through previous keyframes
+                if(!pMP->IsInKeyFrame(mpCurrentKeyFrame->mnId)) // Changing the function to receive id instead of keyframe pointer
+                {
+                    if (pMP->lmSet) // This shows the local mapping id of mappoint is set
+                    {
+                        pMP = mpMap->RetrieveMapPoint(pMP->lmMnId, false);
+                    }
+                    else // If local mapping id is not set, we try to find the mappoint by tracking id
+                    {
+                        pMP = mpMap->RetrieveMapPoint(pMP->mnId, true);
+                    }
+
+                    if (pMP) // If it has not been removed and its available in the global map
+                    {
+                        pMP->AddObservation(mpCurrentKeyFrame, i);
+                        pMP->UpdateNormalAndDepth();
+
+                        pMP->ComputeDistinctiveDescriptors();
+
+                        // Add the corresponding address in global map
+                        mpCurrentKeyFrame->AddMapPoint(pMP, i);
+                    }
+                    else
+                    {
+                        mpCurrentKeyFrame->EraseMapPointMatch(i);
+                    }
                 }
                 else // this can only happen for new stereo points inserted by the Tracking
                 {
+                    pMP->AssignId(false);
+                    pMP->AddObservation(mpCurrentKeyFrame, i); // Because we haven't transferred mObservations, we need it
+
                     mlpRecentAddedMapPoints.push_back(pMP);
+
+                    mpMap->AddMapPoint(pMP); // Since we have a separate map from tracking map
+                    pMP->setMapPointer(mpMap); // We are not sending the map pointer in marshalling
                 }
             }
         }
-    }    
+    }
 
     // Update links in the Covisibility Graph
     mpCurrentKeyFrame->UpdateConnections();
@@ -339,7 +614,7 @@ void LocalMapping::CreateNewMapPoints()
             }
             else if(bStereo1 && cosParallaxStereo1<cosParallaxStereo2)
             {
-                x3D = mpCurrentKeyFrame->UnprojectStereo(idx1);                
+                x3D = mpCurrentKeyFrame->UnprojectStereo(idx1);
             }
             else if(bStereo2 && cosParallaxStereo2<cosParallaxStereo1)
             {
@@ -430,10 +705,11 @@ void LocalMapping::CreateNewMapPoints()
             if(ratioDist*ratioFactor<ratioOctave || ratioDist>ratioOctave*ratioFactor)
                 continue;
 
+            // Edge-SLAM: added wchThread parameter
             // Triangulation is succesfull
-            MapPoint* pMP = new MapPoint(x3D,mpCurrentKeyFrame,mpMap);
+            MapPoint* pMP = new MapPoint(x3D,mpCurrentKeyFrame,mpMap,2);
 
-            pMP->AddObservation(mpCurrentKeyFrame,idx1);            
+            pMP->AddObservation(mpCurrentKeyFrame,idx1);
             pMP->AddObservation(pKF2,idx2);
 
             mpCurrentKeyFrame->AddMapPoint(pMP,idx1);
@@ -688,7 +964,7 @@ void LocalMapping::KeyFrameCulling()
                     }
                 }
             }
-        }  
+        }
 
         if(nRedundantObservations>0.9*nMPs)
             pKF->SetBadFlag();
@@ -709,6 +985,7 @@ void LocalMapping::RequestReset()
         mbResetRequested = true;
     }
 
+    /* Edge-SLAM: disabled, because local mapping thread is handling the system reset
     while(1)
     {
         {
@@ -717,7 +994,7 @@ void LocalMapping::RequestReset()
                 break;
         }
         usleep(3000);
-    }
+    }*/
 }
 
 void LocalMapping::ResetIfRequested()
@@ -725,10 +1002,63 @@ void LocalMapping::ResetIfRequested()
     unique_lock<mutex> lock(mMutexReset);
     if(mbResetRequested)
     {
+        // Edge-SLAM
+        cout << "Starting Edge-SLAM server reset..." << endl;
+        // Reset Local Mapping
+        cout << "Reseting Local Mapper...";
+
         mlNewKeyFrames.clear();
         mlpRecentAddedMapPoints.clear();
+
+        // Edge-SLAM: reset Edge-SLAM variables
+        // Edge-SLAM: measure
+        msLastMUStart = std::chrono::high_resolution_clock::now();
+        // Edge-SLAM: map update variables
+        msNewKFFlag = false;
+        while(!msLatestKFsId.empty())
+            msLatestKFsId.pop();
+        // Edge-SLAM: relocalization
+        msRelocStatus = false;
+        msRelocNewFFlag = false;
+        usCandidateKFsId.clear();
+        vpCandidateKFs.clear();
+        // Edge-SLAM
+        mnLastKeyFrameId = 0;
+
+        // Edge-SLAM: reset frame/keyframe/map queues
+        string data;
+        // Keyframe
+        while(keyframe_queue.try_dequeue(data))
+        {
+            data.clear();
+        }
+        // Frame
+        while(frame_queue.try_dequeue(data))
+        {
+            data.clear();
+        }
+        // Map
+        while(map_queue.try_dequeue(data))
+        {
+            data.clear();
+        }
+
+        // Edge-SLAM: continue reset process
+        cout << " done" << endl;
+        Reset();
+
         mbResetRequested=false;
+
+        // Edge-SLAM
+        cout << "Edge-SLAM server reset is complete" << endl;
     }
+}
+
+// Edge-SLAM
+bool LocalMapping::CheckReset()
+{
+    unique_lock<mutex> lock(mMutexReset);
+    return mbResetRequested;
 }
 
 void LocalMapping::RequestFinish()
@@ -745,8 +1075,15 @@ bool LocalMapping::CheckFinish()
 
 void LocalMapping::SetFinish()
 {
+    // Edge-SLAM: terminate TCP threads
+    keyframe_socket->~TcpSocket();
+    frame_socket->~TcpSocket();
+    map_socket->~TcpSocket();
+    // This is just a dummy enqueue to unblock the wait_dequeue function in tcp_send()
+    map_queue.enqueue("exit");
+
     unique_lock<mutex> lock(mMutexFinish);
-    mbFinished = true;    
+    mbFinished = true;
     unique_lock<mutex> lock2(mMutexStop);
     mbStopped = true;
 }
@@ -757,4 +1094,449 @@ bool LocalMapping::isFinished()
     return mbFinished;
 }
 
+// Edge-SLAM: similar to Tracking::NeedNewKeyFrame(), but customized for local-mapping
+bool LocalMapping::NeedNewKeyFrame(KeyFrame* pKF)
+{
+    // If Local Mapping is freezed by a Loop Closure do not insert keyframes
+    if(isStopped() || stopRequested())
+        return false;
+
+    // Edge-SLAM: part one of this condition was checked in CreateNewKeyFrame() in tracking on client
+    // Edge-SLAM: now checking part two
+    const int nKFs = mpMap->KeyFramesInMap();
+    // Do not insert keyframes if not enough frames have passed from last relocalisation
+    if(!(pKF->GetPassedF()) && nKFs>mMaxFrames)
+        return false;
+
+    // Local Mapping accept keyframes?
+    bool bLocalMappingIdle = AcceptKeyFrames();
+
+    // Edge-SLAM: checked in NeedNewKeyFrame() function in tracking thread on client
+    // Condition 1c: tracking is weak
+    //const bool c1c =  mSensor!=System::MONOCULAR && (mnMatchesInliers<nRefMatches*0.25 || bNeedToInsertClose) ;
+    // Condition 2: Few tracked points compared to reference keyframe. Lots of visual odometry compared to map matches.
+    //const bool c2 = ((mnMatchesInliers<nRefMatches*thRefRatio|| bNeedToInsertClose) && mnMatchesInliers>15);
+
+    // Edge-SLAM: customized for server side
+    bool c1a = false;
+    bool c1b = false;
+    if(pKF->GetNeedNKF() == 1)
+    {
+        // Condition 1a: More than "MaxFrames" have passed from last keyframe insertion
+        c1a = pKF->mnFrameId >= mnLastKeyFrameId+mMaxFrames;
+        // Condition 1b: More than "MinFrames" have passed and Local Mapping is idle
+        c1b = (pKF->mnFrameId >= mnLastKeyFrameId+mMinFrames && bLocalMappingIdle);
+    }
+
+    if(c1a || c1b || (pKF->GetNeedNKF() == 2))
+    {
+        // If the mapping accepts keyframes, insert keyframe.
+        // Otherwise send a signal to interrupt BA
+        if(bLocalMappingIdle)
+        {
+            return true;
+        }
+        else
+        {
+            InterruptBA();
+            if(!mbMonocular)
+            {
+                if(KeyframesInQueue()<3)
+                    return true;
+                else
+                    return false;
+            }
+            else
+                return false;
+        }
+    }
+    else
+        return false;
+}
+
+// Edge-SLAM
+void LocalMapping::frameCallback(const std::string& msg)
+{
+    // If Local Mapping is freezed by a Loop Closure do not process frame
+    if(isStopped() || stopRequested())
+        return;
+
+    // Moved from CreateNewKeyFrame() function in tracking thread on client
+    if(!SetNotStop(true))
+        return;
+
+    Frame *F = new Frame();
+    try
+    {
+        std::stringstream iis(msg);
+        boost::archive::text_iarchive iia(iis);
+        iia >> F;
+    }
+    catch(boost::archive::archive_exception e)
+    {
+        cout << "log,LocalMapping::frameCallback,error: " << e.what() << endl;
+        SetNotStop(false);
+        return;
+    }
+
+    // Relocalization is performed when tracking is lost
+    // Track Lost: Query KeyFrame Database for keyframe candidates for relocalisation
+    vector<KeyFrame*> caKFs = mpKeyFrameDB->DetectRelocalizationCandidates(F);
+
+    for(vector<KeyFrame*>::iterator it = caKFs.begin(); it != caKFs.end(); it++)
+    {
+        KeyFrame* cKF = *it;
+
+        // Using unordered set which only accepts unique elements and has fast
+        // retrieval times. If insertion was successful, then add keyframe
+        if(usCandidateKFsId.insert(cKF->mnId).second)
+            vpCandidateKFs.push_back(cKF);
+    }
+
+    msNewKFFlag = false;
+    msRelocStatus = true;
+    msRelocNewFFlag = true;
+
+    cout << "log,LocalMapping::frameCallback,received relocalization request" << endl;
+
+    delete F;
+
+    SetNotStop(false);
+}
+
+// Edge-SLAM
+void LocalMapping::sendLocalMapUpdate()
+{
+    cout << "log,LocalMapping::sendLocalMapUpdate,publish local map update" << endl;
+
+    std::vector<std::string> KFsData;
+
+    // If map size is less than localMapSize, send the whole map, else send the lastest of size localMapSize
+    long unsigned localMapSize = KF_NUM;
+    if(mpMap->KeyFramesInMap() <= localMapSize)
+    {
+        // Get all keyframes
+        vector<KeyFrame*> current_local_map = mpMap->GetAllKeyFrames();
+
+        cout << "log,LocalMapping::sendLocalMapUpdate,keyframes in local map update: ";
+
+        // Iterate through all keyframes in map
+        for(vector<KeyFrame*>::iterator mit = current_local_map.begin(); mit != current_local_map.end(); mit++)
+        {
+            KeyFrame* tKF = *mit;
+
+            std::ostringstream os;
+            boost::archive::text_oarchive oa(os);
+            oa << tKF;
+            KFsData.push_back(os.str());
+            os.clear();
+
+            cout << tKF->mnId << " ";
+        }
+
+        cout << endl;
+    }
+    else
+    {
+        cout << "log,LocalMapping::sendLocalMapUpdate,keyframes in local map update: ";
+
+        // Temporary stack to hold popped KF ids
+        stack<long unsigned int> msLocalKFsId;
+
+        // Pop from stack until localMapSize is reached
+        long unsigned count = 0;
+        while ((count < localMapSize) && (msLatestKFsId.size() > 0))
+        {
+            KeyFrame* tKF = mpMap->RetrieveKeyFrame(msLatestKFsId.top());
+            msLocalKFsId.push(msLatestKFsId.top());
+            msLatestKFsId.pop();
+
+            if(tKF)
+            {
+                std::ostringstream os;
+                boost::archive::text_oarchive oa(os);
+                oa << tKF;
+                KFsData.push_back(os.str());
+                os.clear();
+
+                cout << tKF->mnId << " ";
+
+                count++;
+            }
+        }
+
+        // Clear Latest KF ids stack
+        while(!msLatestKFsId.empty())
+            msLatestKFsId.pop();
+
+        // Return last latest KF ids from temporary stack to original stack
+        while(!msLocalKFsId.empty())
+        {
+            msLatestKFsId.push(msLocalKFsId.top());
+            msLocalKFsId.pop();
+        }
+
+        cout << endl;
+    }
+
+    if(KFsData.size() > 0)
+    {
+        std::ostringstream os;
+        boost::archive::text_oarchive oa(os);
+        oa << KFsData;
+        std::string msg;
+        msg = os.str();
+        os.clear();
+
+        map_queue.enqueue(msg);
+
+        msLastMUStart = std::chrono::high_resolution_clock::now();
+    }
+
+    // Clear
+    KFsData.clear();
+
+    // Clear relocalization vectors
+    usCandidateKFsId.clear();
+    vpCandidateKFs.clear();
+
+    // Set to false so no map update is sent until we receive a new keyframe
+    msNewKFFlag = false;
+}
+
+// Edge-SLAM: relocalization
+void LocalMapping::sendRelocMapUpdate()
+{
+    if(!vpCandidateKFs.empty())
+    {
+        // Relocalization map
+
+        // Unordered set of KFs Id for duplicate checking
+        std::unordered_set<long unsigned int> KFsId;
+        // Vector of serialized KFs
+        std::vector<std::string> KFsData;
+
+        cout << "log,LocalMapping::sendRelocMapUpdate,keyframes in relocalization map: ";
+
+        for(vector<KeyFrame*>::iterator vpcit = vpCandidateKFs.begin(); vpcit != vpCandidateKFs.end(); vpcit++)
+        {
+            KeyFrame* vpcKF = *vpcit;
+
+            // Duplicate check
+            if(!KFsId.insert(vpcKF->mnId).second)
+                continue;
+
+            // first we should send the current keyframe
+            std::ostringstream os_current;
+            boost::archive::text_oarchive oa_current(os_current);
+            oa_current << vpcKF;
+            KFsData.push_back(os_current.str());
+            os_current.clear();
+
+            cout << vpcKF->mnId << " ";
+
+            // next we get the connected keyframes
+            vector<KeyFrame*> current_local_map = vpcKF->GetVectorCovisibleKeyFrames();
+
+            // Counter to limit the number of connected keyframes in reloc map
+            int kfCount = 1;
+            for(vector<KeyFrame*>::iterator mit = current_local_map.begin(); mit != current_local_map.end(); mit++)
+            {
+                KeyFrame* tKF = *mit;
+
+                // Duplicate check
+                if(!KFsId.insert(tKF->mnId).second)
+                    continue;
+
+                // Check connected kf count
+                if(kfCount>CONN_KF)
+                    break;
+                kfCount++;
+
+                std::ostringstream os;
+                boost::archive::text_oarchive oa(os);
+                oa << tKF;
+                KFsData.push_back(os.str());
+                os.clear();
+
+                cout << tKF->mnId << " ";
+            }
+        }
+
+        cout << endl;
+
+        // Attach latest local-map to relocalization map
+
+        cout << "log,LocalMapping::sendRelocMapUpdate,attach latest local-map to relocalization map" << endl;
+
+        // If map size is less than localMapSize, send the whole map, else send the lastest of size localMapSize
+        long unsigned localMapSize = KF_NUM;
+        if(mpMap->KeyFramesInMap() <= localMapSize)
+        {
+            // Get all keyframes
+            vector<KeyFrame*> current_local_map = mpMap->GetAllKeyFrames();
+
+            cout << "log,LocalMapping::sendRelocMapUpdate,keyframes in local map update: ";
+
+            // Iterate through all keyframes in map
+            for(vector<KeyFrame*>::iterator mit = current_local_map.begin(); mit != current_local_map.end(); mit++)
+            {
+                KeyFrame* tKF = *mit;
+
+                // Duplicate check
+                if(!KFsId.insert(tKF->mnId).second)
+                    continue;
+
+                std::ostringstream os;
+                boost::archive::text_oarchive oa(os);
+                oa << tKF;
+                KFsData.push_back(os.str());
+                os.clear();
+
+                cout << tKF->mnId << " ";
+            }
+
+            cout << endl;
+        }
+        else
+        {
+            cout << "log,LocalMapping::sendRelocMapUpdate,keyframes in local map update: ";
+
+            // Temporary stack to hold popped KF ids
+            stack<long unsigned int> msLocalKFsId;
+
+            // Pop from stack until localMapSize is reached
+            long unsigned count = 0;
+            while ((count < localMapSize) && (msLatestKFsId.size() > 0))
+            {
+                KeyFrame* tKF = mpMap->RetrieveKeyFrame(msLatestKFsId.top());
+                msLocalKFsId.push(msLatestKFsId.top());
+                msLatestKFsId.pop();
+
+                if(tKF)
+                {
+                    // Duplicate check
+                    if(!KFsId.insert(tKF->mnId).second)
+                        continue;
+
+                    std::ostringstream os;
+                    boost::archive::text_oarchive oa(os);
+                    oa << tKF;
+                    KFsData.push_back(os.str());
+                    os.clear();
+
+                    cout << tKF->mnId << " ";
+
+                    count++;
+                }
+            }
+
+            // Clear Latest KF ids stack
+            while(!msLatestKFsId.empty())
+                msLatestKFsId.pop();
+
+            // Return last latest KF ids from temporary stack to original stack
+            while(!msLocalKFsId.empty())
+            {
+                msLatestKFsId.push(msLocalKFsId.top());
+                msLocalKFsId.pop();
+            }
+
+            cout << endl;
+        }
+
+        std::ostringstream os;
+        boost::archive::text_oarchive oa(os);
+        oa << KFsData;
+        std::string msg;
+        msg = os.str();
+        os.clear();
+
+        map_queue.enqueue(msg);
+
+        // Clear
+        KFsId.clear();
+        KFsData.clear();
+
+        msLastMUStart = std::chrono::high_resolution_clock::now();
+    }
+    else
+    {
+        cout << "log,LocalMapping::sendRelocMapUpdate,publish relocalization map: candidate KF vector is empty" << endl;
+    }
+
+    // Clear relocalization vectors
+    usCandidateKFsId.clear();
+    vpCandidateKFs.clear();
+    msRelocNewFFlag = false;
+}
+
+// Edge-SLAM: send function to be called on a separate thread
+void LocalMapping::tcp_send(moodycamel::BlockingConcurrentQueue<std::string>* messageQueue, TcpSocket* socketObject, std::string name)
+{
+    std::string msg;
+    bool success = true;
+
+    // This is not a busy wait because wait_dequeue function is blocking
+    do
+    {
+        if(!socketObject->checkAlive())
+        {
+            cout << "log,LocalMapping::tcp_send,terminating thread" << endl;
+
+            break;
+        }
+
+        if(success)
+            messageQueue->wait_dequeue(msg);
+
+        if((!msg.empty()) && (msg.compare("exit") != 0))
+        {
+            if(socketObject->sendMessage(msg)==1)
+            {
+                success = true;
+                msg.clear();
+
+                cout << "log,LocalMapping::tcp_send,sent " << name << endl;
+            }
+            else
+            {
+                success = false;
+            }
+        }
+    } while(1);
+}
+
+// Edge-SLAM: receive function to be called on a separate thread
+void LocalMapping::tcp_receive(moodycamel::ConcurrentQueue<std::string>* messageQueue, TcpSocket* socketObject, unsigned int maxQueueSize, std::string name)
+{
+    // Here the while(1) won't cause busy waiting as the implementation of receive function is blocking.
+    while(1)
+    {
+        if(!socketObject->checkAlive())
+        {
+            cout << "log,LocalMapping::tcp_receive,terminating thread" << endl;
+
+            break;
+        }
+        std::string msg = socketObject->recieveMessage();
+
+        if(!msg.empty())
+        {
+            if(messageQueue->size_approx() >= maxQueueSize)
+            {
+                string data;
+                if(messageQueue->try_dequeue(data))
+                {
+                    data.clear();
+                }
+            }
+            messageQueue->enqueue(msg);
+
+            cout << "log,LocalMapping::tcp_receive,received " << name << endl;
+        }
+    }
+}
+
 } //namespace ORB_SLAM
+

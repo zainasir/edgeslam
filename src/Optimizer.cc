@@ -1,4 +1,4 @@
-﻿/**
+/**
 * This file is part of ORB-SLAM2.
 *
 * Copyright (C) 2014-2016 Raúl Mur-Artal <raulmur at unizar dot es> (University of Zaragoza)
@@ -93,7 +93,10 @@ void Optimizer::BundleAdjustment(const vector<KeyFrame *> &vpKFs, const vector<M
             continue;
         g2o::VertexSBAPointXYZ* vPoint = new g2o::VertexSBAPointXYZ();
         vPoint->setEstimate(Converter::toVector3d(pMP->GetWorldPos()));
-        const int id = pMP->mnId+maxKFid+1;
+
+        // Edge-SLAM: replaced mnId with GetId()
+        const int id = pMP->GetId()+maxKFid+1;
+
         vPoint->setId(id);
         vPoint->setMarginalized(true);
         optimizer.addVertex(vPoint);
@@ -219,7 +222,9 @@ void Optimizer::BundleAdjustment(const vector<KeyFrame *> &vpKFs, const vector<M
 
         if(pMP->isBad())
             continue;
-        g2o::VertexSBAPointXYZ* vPoint = static_cast<g2o::VertexSBAPointXYZ*>(optimizer.vertex(pMP->mnId+maxKFid+1));
+
+        // Edge-SLAM: replaced mnId with GetId()
+        g2o::VertexSBAPointXYZ* vPoint = static_cast<g2o::VertexSBAPointXYZ*>(optimizer.vertex(pMP->GetId()+maxKFid+1));
 
         if(nLoopKF==0)
         {
@@ -574,7 +579,10 @@ void Optimizer::LocalBundleAdjustment(KeyFrame *pKF, bool* pbStopFlag, Map* pMap
         MapPoint* pMP = *lit;
         g2o::VertexSBAPointXYZ* vPoint = new g2o::VertexSBAPointXYZ();
         vPoint->setEstimate(Converter::toVector3d(pMP->GetWorldPos()));
-        int id = pMP->mnId+maxKFid+1;
+
+        // Edge-SLAM: replaced mnId with GetId()
+        int id = pMP->GetId()+maxKFid+1;
+
         vPoint->setId(id);
         vPoint->setMarginalized(true);
         optimizer.addVertex(vPoint);
@@ -771,7 +779,10 @@ void Optimizer::LocalBundleAdjustment(KeyFrame *pKF, bool* pbStopFlag, Map* pMap
     for(list<MapPoint*>::iterator lit=lLocalMapPoints.begin(), lend=lLocalMapPoints.end(); lit!=lend; lit++)
     {
         MapPoint* pMP = *lit;
-        g2o::VertexSBAPointXYZ* vPoint = static_cast<g2o::VertexSBAPointXYZ*>(optimizer.vertex(pMP->mnId+maxKFid+1));
+
+        // Edge-SLAM: replaced mnId with GetId()
+        g2o::VertexSBAPointXYZ* vPoint = static_cast<g2o::VertexSBAPointXYZ*>(optimizer.vertex(pMP->GetId()+maxKFid+1));
+
         pMP->SetWorldPos(Converter::toCvMat(vPoint->estimate()));
         pMP->UpdateNormalAndDepth();
     }
@@ -1025,6 +1036,16 @@ void Optimizer::OptimizeEssentialGraph(Map* pMap, KeyFrame* pLoopKF, KeyFrame* p
         else
         {
             KeyFrame* pRefKF = pMP->GetReferenceKeyFrame();
+
+            // Edge-SLAM: check if mappoint refKF is NULL
+            if(!pRefKF)
+            {
+                // Edge-SLAM: debug
+                cout << "log,Optimizer::OptimizeEssentialGraph,mappoint RefKF is NULL" << endl;
+
+                continue;
+            }
+
             nIDr = pRefKF->mnId;
         }
 

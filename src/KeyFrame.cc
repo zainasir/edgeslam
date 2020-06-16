@@ -28,6 +28,7 @@ namespace ORB_SLAM2
 
 long unsigned int KeyFrame::nNextId=0;
 
+// Edge-SLAM: initialized mNeedNKF, mPassedF, mResetKF
 KeyFrame::KeyFrame(Frame &F, Map *pMap, KeyFrameDatabase *pKFDB):
     mnFrameId(F.mnId),  mTimeStamp(F.mTimeStamp), mnGridCols(FRAME_GRID_COLS), mnGridRows(FRAME_GRID_ROWS),
     mfGridElementWidthInv(F.mfGridElementWidthInv), mfGridElementHeightInv(F.mfGridElementHeightInv),
@@ -40,8 +41,8 @@ KeyFrame::KeyFrame(Frame &F, Map *pMap, KeyFrameDatabase *pKFDB):
     mfLogScaleFactor(F.mfLogScaleFactor), mvScaleFactors(F.mvScaleFactors), mvLevelSigma2(F.mvLevelSigma2),
     mvInvLevelSigma2(F.mvInvLevelSigma2), mnMinX(F.mnMinX), mnMinY(F.mnMinY), mnMaxX(F.mnMaxX),
     mnMaxY(F.mnMaxY), mK(F.mK), mvpMapPoints(F.mvpMapPoints), mpKeyFrameDB(pKFDB),
-    mpORBvocabulary(F.mpORBvocabulary), mbFirstConnection(true), mpParent(NULL), mbNotErase(false),
-    mbToBeErased(false), mbBad(false), mHalfBaseline(F.mb/2), mpMap(pMap)
+    mpORBvocabulary(F.mpORBvocabulary), mbFirstConnection(true), mpParent(NULL), mpParent_id(0), mbNotErase(false),
+    mbToBeErased(false), mbBad(false), mHalfBaseline(F.mb/2), mpMap(pMap), mNeedNKF(2), mPassedF(true), mResetKF(false)
 {
     mnId=nNextId++;
 
@@ -53,7 +54,87 @@ KeyFrame::KeyFrame(Frame &F, Map *pMap, KeyFrameDatabase *pKFDB):
             mGrid[i][j] = F.mGrid[i][j];
     }
 
-    SetPose(F.mTcw);    
+    SetPose(F.mTcw);
+}
+
+// Edge-SLAM: mNeedNKF setter function
+void KeyFrame::SetNeedNKF(int needNKF)
+{
+    mNeedNKF = needNKF;
+}
+
+// Edge-SLAM: mPassedF setter function
+void KeyFrame::SetPassedF(bool passedF)
+{
+    mPassedF = passedF;
+}
+
+// Edge-SLAM: mResetKF setter function
+void KeyFrame::SetResetKF(bool resetKF)
+{
+    mResetKF = resetKF;
+}
+
+// Edge-SLAM: mNeedNKF getter function
+int KeyFrame::GetNeedNKF()
+{
+    return mNeedNKF;
+}
+
+// Edge-SLAM: mPassedF getter function
+bool KeyFrame::GetPassedF()
+{
+    return mPassedF;
+}
+
+// Edge-SLAM: mResetKF getter function
+bool KeyFrame::GetResetKF()
+{
+    return mResetKF;
+}
+
+// Edge-SLAM
+void KeyFrame::ReconstructConnections()
+{
+    // Reconstruct connected keyframes
+    // The viewer needs the weights, so we send them, but we should adjust them based on available keyframes within the map
+    std::vector<int> mvOrderedWeights_copy(mvOrderedWeights);
+    mvOrderedWeights.clear();
+    std::vector<int>::iterator it_weight = mvOrderedWeights_copy.begin();
+    for (std::vector<long int>::iterator it=mvpOrderedConnectedKeyFrames_ids.begin(); it!=mvpOrderedConnectedKeyFrames_ids.end(); ++it, ++it_weight)
+    {
+        if(mpMap->RetrieveKeyFrame(*it) != NULL)
+        {
+            mvpOrderedConnectedKeyFrames.push_back(mpMap->RetrieveKeyFrame(*it));
+
+            mvOrderedWeights.push_back(*it_weight);
+        }
+    }
+
+    // Reconstruct parent keyframe
+    if(mpMap->RetrieveKeyFrame(mpParent_id) != NULL)
+    {
+        // ChangeParent() not necessary to be used here
+        // If used, it will cause segmentation fault
+        // Replaced with the necessary statements
+        //ChangeParent(mpMap->RetrieveKeyFrame(mpParent_id));
+        mpParent = mpMap->RetrieveKeyFrame(mpParent_id);
+        mpParent_id = mpMap->RetrieveKeyFrame(mpParent_id)->mnId;
+    }
+    else
+    {
+        // Set the pointer to NULL
+        mpParent = static_cast<KeyFrame*>(NULL);
+    }
+
+    // Reconstruct children keyframes
+    for (std::set<long int>::iterator it=mspChildrens_ids.begin(); it!=mspChildrens_ids.end(); ++it)
+    {
+        if(mpMap->RetrieveKeyFrame(*it) != NULL)
+        {
+            AddChild(mpMap->RetrieveKeyFrame(*it));
+        }
+    }
 }
 
 void KeyFrame::ComputeBoW()
@@ -146,14 +227,24 @@ void KeyFrame::UpdateBestCovisibles()
     sort(vPairs.begin(),vPairs.end());
     list<KeyFrame*> lKFs;
     list<int> lWs;
+
+    // Edge-SLAM
+    list<long int> lKFs_ids;
+
     for(size_t i=0, iend=vPairs.size(); i<iend;i++)
     {
         lKFs.push_front(vPairs[i].second);
         lWs.push_front(vPairs[i].first);
+
+        // Edge-SLAM
+        lKFs_ids.push_front((vPairs[i].second)->mnId);
     }
 
     mvpOrderedConnectedKeyFrames = vector<KeyFrame*>(lKFs.begin(),lKFs.end());
-    mvOrderedWeights = vector<int>(lWs.begin(), lWs.end());    
+    mvOrderedWeights = vector<int>(lWs.begin(), lWs.end());
+
+    // Edge-SLAM
+    mvpOrderedConnectedKeyFrames_ids = vector<long int>(lKFs_ids.begin(), lKFs_ids.end());
 }
 
 set<KeyFrame*> KeyFrame::GetConnectedKeyFrames()
@@ -354,10 +445,17 @@ void KeyFrame::UpdateConnections()
     sort(vPairs.begin(),vPairs.end());
     list<KeyFrame*> lKFs;
     list<int> lWs;
+
+    // Edge-SLAM
+    list<long int> lKFs_ids;
+
     for(size_t i=0; i<vPairs.size();i++)
     {
         lKFs.push_front(vPairs[i].second);
         lWs.push_front(vPairs[i].first);
+
+        // Edge-SLAM
+        lKFs_ids.push_front((vPairs[i].second)->mnId);
     }
 
     {
@@ -366,15 +464,22 @@ void KeyFrame::UpdateConnections()
         // mspConnectedKeyFrames = spConnectedKeyFrames;
         mConnectedKeyFrameWeights = KFcounter;
         mvpOrderedConnectedKeyFrames = vector<KeyFrame*>(lKFs.begin(),lKFs.end());
+
+        // Edge-SLAM
+        mvpOrderedConnectedKeyFrames_ids = vector<long int>(lKFs_ids.begin(),lKFs_ids.end());
+
         mvOrderedWeights = vector<int>(lWs.begin(), lWs.end());
 
         if(mbFirstConnection && mnId!=0)
         {
             mpParent = mvpOrderedConnectedKeyFrames.front();
+
+            // Edge-SLAM
+            mpParent_id = mpParent->mnId;
+
             mpParent->AddChild(this);
             mbFirstConnection = false;
         }
-
     }
 }
 
@@ -382,19 +487,39 @@ void KeyFrame::AddChild(KeyFrame *pKF)
 {
     unique_lock<mutex> lockCon(mMutexConnections);
     mspChildrens.insert(pKF);
+
+    // Edge-SLAM
+    mspChildrens_ids.insert(pKF->mnId);
 }
 
 void KeyFrame::EraseChild(KeyFrame *pKF)
 {
     unique_lock<mutex> lockCon(mMutexConnections);
     mspChildrens.erase(pKF);
+
+    // Edge-SLAM
+    mspChildrens_ids.erase(pKF->mnId);
 }
 
 void KeyFrame::ChangeParent(KeyFrame *pKF)
 {
     unique_lock<mutex> lockCon(mMutexConnections);
-    mpParent = pKF;
-    pKF->AddChild(this);
+
+    //Edge-SLAM
+    if (pKF)
+    {
+        mpParent = pKF;
+
+        pKF->AddChild(this);
+
+        // Edge-SLAM
+        mpParent_id = pKF->mnId;
+    }
+    else
+    {
+        mpParent = static_cast<KeyFrame*>(NULL);
+        mpParent_id = 0;
+    }
 }
 
 set<KeyFrame*> KeyFrame::GetChilds()
@@ -451,7 +576,7 @@ void KeyFrame::SetErase()
 }
 
 void KeyFrame::SetBadFlag()
-{   
+{
     {
         unique_lock<mutex> lock(mMutexConnections);
         if(mnId==0)
@@ -475,6 +600,10 @@ void KeyFrame::SetBadFlag()
 
         mConnectedKeyFrameWeights.clear();
         mvpOrderedConnectedKeyFrames.clear();
+
+        // Edge-SLAM
+        mvpOrderedConnectedKeyFrames_ids.clear();
+
 
         // Update Spanning Tree
         set<KeyFrame*> sParentCandidates;
@@ -522,6 +651,9 @@ void KeyFrame::SetBadFlag()
                 pC->ChangeParent(pP);
                 sParentCandidates.insert(pC);
                 mspChildrens.erase(pC);
+
+                // Edge-SLAM
+                mspChildrens_ids.erase(pC->mnId);
             }
             else
                 break;

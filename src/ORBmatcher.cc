@@ -263,7 +263,6 @@ int ORBmatcher::SearchByBoW(KeyFrame* pKF,Frame &F, vector<MapPoint*> &vpMapPoin
         }
     }
 
-
     if(mbCheckOrientation)
     {
         int ind1=-1;

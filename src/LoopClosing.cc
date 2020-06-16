@@ -34,13 +34,15 @@
 
 namespace ORB_SLAM2
 {
-
 LoopClosing::LoopClosing(Map *pMap, KeyFrameDatabase *pDB, ORBVocabulary *pVoc, const bool bFixScale):
     mbResetRequested(false), mbFinishRequested(false), mbFinished(true), mpMap(pMap),
     mpKeyFrameDB(pDB), mpORBVocabulary(pVoc), mpMatchedKF(NULL), mLastLoopKFid(0), mbRunningGBA(false), mbFinishedGBA(true),
     mbStopGBA(false), mpThreadGBA(NULL), mbFixScale(bFixScale), mnFullBAIdx(0)
 {
     mnCovisibilityConsistencyTh = 3;
+
+    // Edge-SLAM: debug
+    cout << "log,LoopClosing::LoopClosing,done" << endl;
 }
 
 void LoopClosing::SetTracker(Tracking *pTracker)
@@ -74,7 +76,7 @@ void LoopClosing::Run()
                    CorrectLoop();
                }
             }
-        }       
+        }
 
         ResetIfRequested();
 
@@ -413,7 +415,9 @@ void LoopClosing::CorrectLoop()
         unique_lock<mutex> lock(mMutexGBA);
         mbStopGBA = true;
 
-        mnFullBAIdx++;
+        // Edge-SLAM: use of an operand of type ‘bool’ in ‘operator++’ is deprecated
+        //mnFullBAIdx++;
+        mnFullBAIdx = 1;
 
         if(mpThreadGBA)
         {
@@ -533,14 +537,12 @@ void LoopClosing::CorrectLoop()
                 }
             }
         }
-
     }
 
     // Project MapPoints observed in the neighborhood of the loop keyframe
     // into the current keyframe and neighbors using corrected poses.
     // Fuse duplications.
     SearchAndFuse(CorrectedSim3);
-
 
     // After the MapPoint fusion, new links in the covisibility graph will appear attaching both sides of the loop
     map<KeyFrame*, set<KeyFrame*> > LoopConnections;
@@ -579,9 +581,9 @@ void LoopClosing::CorrectLoop()
     mpThreadGBA = new thread(&LoopClosing::RunGlobalBundleAdjustment,this,mpCurrentKF->mnId);
 
     // Loop closed. Release Local Mapping.
-    mpLocalMapper->Release();    
+    mpLocalMapper->Release();
 
-    mLastLoopKFid = mpCurrentKF->mnId;   
+    mLastLoopKFid = mpCurrentKF->mnId;
 }
 
 void LoopClosing::SearchAndFuse(const KeyFrameAndPose &CorrectedPosesMap)
@@ -600,6 +602,7 @@ void LoopClosing::SearchAndFuse(const KeyFrameAndPose &CorrectedPosesMap)
 
         // Get Map Mutex
         unique_lock<mutex> lock(mpMap->mMutexMapUpdate);
+
         const int nLP = mvpLoopMapPoints.size();
         for(int i=0; i<nLP;i++)
         {
@@ -719,6 +722,15 @@ void LoopClosing::RunGlobalBundleAdjustment(unsigned long nLoopKF)
                     // Update according to the correction of its reference keyframe
                     KeyFrame* pRefKF = pMP->GetReferenceKeyFrame();
 
+                    // Edge-SLAM: check if mappoint refKF is NULL
+                    if(!pRefKF)
+                    {
+                        // Edge-SLAM: debug
+                        cout << "log,LoopClosing::RunGlobalBundleAdjustment,mappoint RefKF is NULL" << endl;
+
+                        continue;
+                    }
+
                     if(pRefKF->mnBAGlobalForKF!=nLoopKF)
                         continue;
 
@@ -734,7 +746,7 @@ void LoopClosing::RunGlobalBundleAdjustment(unsigned long nLoopKF)
 
                     pMP->SetWorldPos(Rwc*Xc+twc);
                 }
-            }            
+            }
 
             mpMap->InformNewBigChange();
 

@@ -28,10 +28,11 @@
 
 namespace ORB_SLAM2
 {
-
-System::System(const string &strVocFile, const string &strSettingsFile, const eSensor sensor,
-               const bool bUseViewer):mSensor(sensor), mpViewer(static_cast<Viewer*>(NULL)), mbReset(false),mbActivateLocalizationMode(false),
-        mbDeactivateLocalizationMode(false)
+// Edge-SLAM: added run type string
+// Edge-SLAM: divided code between client and server
+System::System(const string &strVocFile, const string &strSettingsFile, std::string rt, const eSensor sensor, const bool bUseViewer):
+    mSensor(sensor), RunType(std::move(rt)), mpViewer(static_cast<Viewer*>(NULL)), mbReset(false),mbActivateLocalizationMode(false),
+    mbDeactivateLocalizationMode(false)
 {
     // Output welcome message
     cout << endl <<
@@ -53,8 +54,8 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
     cv::FileStorage fsSettings(strSettingsFile.c_str(), cv::FileStorage::READ);
     if(!fsSettings.isOpened())
     {
-       cerr << "Failed to open settings file at: " << strSettingsFile << endl;
-       exit(-1);
+        cerr << "Failed to open settings file at: " << strSettingsFile << endl;
+        exit(-1);
     }
 
 
@@ -77,55 +78,69 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
     //Create the Map
     mpMap = new Map();
 
-    //Create Drawers. These are used by the Viewer
-    mpFrameDrawer = new FrameDrawer(mpMap);
-    mpMapDrawer = new MapDrawer(mpMap, strSettingsFile);
+    // Edge-SLAM: client/server
+    if (RunType.compare("client") == 0){
+        //Create Drawers. These are used by the Viewer
+        mpFrameDrawer = new FrameDrawer(mpMap);
+        mpMapDrawer = new MapDrawer(mpMap, strSettingsFile);
 
-    //Initialize the Tracking thread
-    //(it will live in the main thread of execution, the one that called this constructor)
-    mpTracker = new Tracking(this, mpVocabulary, mpFrameDrawer, mpMapDrawer,
-                             mpMap, mpKeyFrameDatabase, strSettingsFile, mSensor);
+        //Initialize the Tracking thread
+        //(it will live in the main thread of execution, the one that called this constructor)
+        mpTracker = new Tracking(this, mpVocabulary, mpFrameDrawer, mpMapDrawer,
+                                mpMap, mpKeyFrameDatabase, strSettingsFile, mSensor);
+    } else if (RunType.compare("server") == 0){
+        // Edge-SLAM: added settings file
+        //Initialize the Local Mapping thread and launch
+        mpLocalMapper = new LocalMapping(mpMap, mpKeyFrameDatabase, mpVocabulary, strSettingsFile, mSensor==MONOCULAR);
+        mptLocalMapping = new thread(&ORB_SLAM2::LocalMapping::Run,mpLocalMapper);
 
-    //Initialize the Local Mapping thread and launch
-    mpLocalMapper = new LocalMapping(mpMap, mSensor==MONOCULAR);
-    mptLocalMapping = new thread(&ORB_SLAM2::LocalMapping::Run,mpLocalMapper);
-
-    //Initialize the Loop Closing thread and launch
-    mpLoopCloser = new LoopClosing(mpMap, mpKeyFrameDatabase, mpVocabulary, mSensor!=MONOCULAR);
-    mptLoopClosing = new thread(&ORB_SLAM2::LoopClosing::Run, mpLoopCloser);
-
-    //Initialize the Viewer thread and launch
-    if(bUseViewer)
-    {
-        mpViewer = new Viewer(this, mpFrameDrawer,mpMapDrawer,mpTracker,strSettingsFile);
-        mptViewer = new thread(&Viewer::Run, mpViewer);
-        mpTracker->SetViewer(mpViewer);
+        //Initialize the Loop Closing thread and launch
+        mpLoopCloser = new LoopClosing(mpMap, mpKeyFrameDatabase, mpVocabulary, mSensor!=MONOCULAR);
+        mptLoopClosing = new thread(&ORB_SLAM2::LoopClosing::Run, mpLoopCloser);
     }
 
+    if (RunType.compare("client") == 0){
+        //Initialize the Viewer thread and launch
+        if(bUseViewer)
+        {
+            mpViewer = new Viewer(this, mpFrameDrawer,mpMapDrawer,mpTracker,strSettingsFile);
+            mptViewer = new thread(&Viewer::Run, mpViewer);
+            mpTracker->SetViewer(mpViewer);
+        }
+    }
+
+    // Edge-SLAM: disabled
     //Set pointers between threads
-    mpTracker->SetLocalMapper(mpLocalMapper);
-    mpTracker->SetLoopClosing(mpLoopCloser);
+    //mpTracker->SetLocalMapper(mpLocalMapper);
+    //mpTracker->SetLoopClosing(mpLoopCloser);
 
-    mpLocalMapper->SetTracker(mpTracker);
-    mpLocalMapper->SetLoopCloser(mpLoopCloser);
-
-    mpLoopCloser->SetTracker(mpTracker);
-    mpLoopCloser->SetLocalMapper(mpLocalMapper);
+    if (RunType.compare("server") == 0){
+        // Edge-SLAM: partially disabled
+        //mpLocalMapper->SetTracker(mpTracker);
+        mpLocalMapper->SetLoopCloser(mpLoopCloser);
+        //mpLoopCloser->SetTracker(mpTracker);
+        mpLoopCloser->SetLocalMapper(mpLocalMapper);
+    }
 }
 
+// Edge-SLAM: client
 cv::Mat System::TrackStereo(const cv::Mat &imLeft, const cv::Mat &imRight, const double &timestamp)
 {
     if(mSensor!=STEREO)
     {
         cerr << "ERROR: you called TrackStereo but input sensor was not set to STEREO." << endl;
         exit(-1);
-    }   
+    }
 
     // Check mode change
     {
         unique_lock<mutex> lock(mMutexMode);
         if(mbActivateLocalizationMode)
         {
+            // Edge-SLAM: debug
+            cout << "log,System::TrackStereo(),localization mode branch" << std::endl;
+
+            /* Edge-SLAM: this branch is visited on client, so comment local mapping variables
             mpLocalMapper->RequestStop();
 
             // Wait until Local Mapping has effectively stopped
@@ -133,6 +148,7 @@ cv::Mat System::TrackStereo(const cv::Mat &imLeft, const cv::Mat &imRight, const
             {
                 usleep(1000);
             }
+            */
 
             mpTracker->InformOnlyTracking(true);
             mbActivateLocalizationMode = false;
@@ -140,19 +156,27 @@ cv::Mat System::TrackStereo(const cv::Mat &imLeft, const cv::Mat &imRight, const
         if(mbDeactivateLocalizationMode)
         {
             mpTracker->InformOnlyTracking(false);
-            mpLocalMapper->Release();
+            // Edge-SLAM: this branch is visited on client, so comment local mapping variables
+            //mpLocalMapper->Release();
             mbDeactivateLocalizationMode = false;
         }
     }
 
     // Check reset
     {
-    unique_lock<mutex> lock(mMutexReset);
-    if(mbReset)
-    {
-        mpTracker->Reset();
-        mbReset = false;
-    }
+        unique_lock<mutex> lock(mMutexReset);
+        if(mbReset)
+        {
+            // Edge-SLAM: client/server
+            if (RunType.compare("client") == 0){
+                mpTracker->Reset();
+            } else if (RunType.compare("server") == 0){
+                // Edge-SLAM
+                mpLocalMapper->RequestReset();
+            }
+
+            mbReset = false;
+        }
     }
 
     cv::Mat Tcw = mpTracker->GrabImageStereo(imLeft,imRight,timestamp);
@@ -164,19 +188,24 @@ cv::Mat System::TrackStereo(const cv::Mat &imLeft, const cv::Mat &imRight, const
     return Tcw;
 }
 
+// Edge-SLAM: client
 cv::Mat System::TrackRGBD(const cv::Mat &im, const cv::Mat &depthmap, const double &timestamp)
 {
     if(mSensor!=RGBD)
     {
         cerr << "ERROR: you called TrackRGBD but input sensor was not set to RGBD." << endl;
         exit(-1);
-    }    
+    }
 
     // Check mode change
     {
         unique_lock<mutex> lock(mMutexMode);
         if(mbActivateLocalizationMode)
         {
+            // Edge-SLAM: debug
+            cout << "log,System::TrackRGBD(),localization mode branch" << std::endl;
+
+            /* Edge-SLAM: this branch is visited on client, so comment local mapping variables
             mpLocalMapper->RequestStop();
 
             // Wait until Local Mapping has effectively stopped
@@ -184,6 +213,7 @@ cv::Mat System::TrackRGBD(const cv::Mat &im, const cv::Mat &depthmap, const doub
             {
                 usleep(1000);
             }
+            */
 
             mpTracker->InformOnlyTracking(true);
             mbActivateLocalizationMode = false;
@@ -191,19 +221,27 @@ cv::Mat System::TrackRGBD(const cv::Mat &im, const cv::Mat &depthmap, const doub
         if(mbDeactivateLocalizationMode)
         {
             mpTracker->InformOnlyTracking(false);
-            mpLocalMapper->Release();
+            // Edge-SLAM: this branch is visited on client, so comment local mapping variables
+            //mpLocalMapper->Release();
             mbDeactivateLocalizationMode = false;
         }
     }
 
     // Check reset
     {
-    unique_lock<mutex> lock(mMutexReset);
-    if(mbReset)
-    {
-        mpTracker->Reset();
-        mbReset = false;
-    }
+        unique_lock<mutex> lock(mMutexReset);
+        if(mbReset)
+        {
+            // Edge-SLAM: client/server
+            if (RunType.compare("client") == 0){
+                mpTracker->Reset();
+            } else if (RunType.compare("server") == 0){
+                // Edge-SLAM
+                mpLocalMapper->RequestReset();
+            }
+
+            mbReset = false;
+        }
     }
 
     cv::Mat Tcw = mpTracker->GrabImageRGBD(im,depthmap,timestamp);
@@ -215,6 +253,7 @@ cv::Mat System::TrackRGBD(const cv::Mat &im, const cv::Mat &depthmap, const doub
     return Tcw;
 }
 
+// Edge-SLAM: client
 cv::Mat System::TrackMonocular(const cv::Mat &im, const double &timestamp)
 {
     if(mSensor!=MONOCULAR)
@@ -228,6 +267,10 @@ cv::Mat System::TrackMonocular(const cv::Mat &im, const double &timestamp)
         unique_lock<mutex> lock(mMutexMode);
         if(mbActivateLocalizationMode)
         {
+            // Edge-SLAM: debug
+            cout << "log,System::TrackMonocular(),localization mode branch" << std::endl;
+
+            /* Edge-SLAM: this branch is visited on client, so comment local mapping variables
             mpLocalMapper->RequestStop();
 
             // Wait until Local Mapping has effectively stopped
@@ -235,6 +278,7 @@ cv::Mat System::TrackMonocular(const cv::Mat &im, const double &timestamp)
             {
                 usleep(1000);
             }
+            */
 
             mpTracker->InformOnlyTracking(true);
             mbActivateLocalizationMode = false;
@@ -242,19 +286,27 @@ cv::Mat System::TrackMonocular(const cv::Mat &im, const double &timestamp)
         if(mbDeactivateLocalizationMode)
         {
             mpTracker->InformOnlyTracking(false);
-            mpLocalMapper->Release();
+            // Edge-SLAM: this branch is visited on client, so comment local mapping variables
+            //mpLocalMapper->Release();
             mbDeactivateLocalizationMode = false;
         }
     }
 
     // Check reset
     {
-    unique_lock<mutex> lock(mMutexReset);
-    if(mbReset)
-    {
-        mpTracker->Reset();
-        mbReset = false;
-    }
+        unique_lock<mutex> lock(mMutexReset);
+        if(mbReset)
+        {
+            // Edge-SLAM: client/server
+            if (RunType.compare("client") == 0){
+                mpTracker->Reset();
+            } else if (RunType.compare("server") == 0){
+                // Edge-SLAM
+                mpLocalMapper->RequestReset();
+            }
+
+            mbReset = false;
+        }
     }
 
     cv::Mat Tcw = mpTracker->GrabImageMonocular(im,timestamp);
@@ -267,18 +319,21 @@ cv::Mat System::TrackMonocular(const cv::Mat &im, const double &timestamp)
     return Tcw;
 }
 
+// Edge-SLAM: client
 void System::ActivateLocalizationMode()
 {
     unique_lock<mutex> lock(mMutexMode);
     mbActivateLocalizationMode = true;
 }
 
+// Edge-SLAM: client
 void System::DeactivateLocalizationMode()
 {
     unique_lock<mutex> lock(mMutexMode);
     mbDeactivateLocalizationMode = true;
 }
 
+// Edge-SLAM: client
 bool System::MapChanged()
 {
     static int n=0;
@@ -292,16 +347,19 @@ bool System::MapChanged()
         return false;
 }
 
+// Edge-SLAM: client
 void System::Reset()
 {
     unique_lock<mutex> lock(mMutexReset);
     mbReset = true;
 }
 
-void System::Shutdown()
+// Edge-SLAM: Shutdown has been divided into two functions
+void System::ClientShutdown()
 {
-    mpLocalMapper->RequestFinish();
-    mpLoopCloser->RequestFinish();
+    // Edge-SLAM: call Destructor of tracking to kill all TCP threads
+    mpTracker->~Tracking();
+
     if(mpViewer)
     {
         mpViewer->RequestFinish();
@@ -309,16 +367,31 @@ void System::Shutdown()
             usleep(5000);
     }
 
+    if(mpViewer)
+        pangolin::BindToContext("Edge-SLAM: Map Viewer");
+
+    // Edge-SLAM: just to make sure all threads have stopped
+    usleep(5000);
+}
+
+void System::ServerShutdown()
+{
+    mpLocalMapper->RequestFinish();
+
+    mpLoopCloser->RequestFinish();
+
     // Wait until all thread have effectively stopped
     while(!mpLocalMapper->isFinished() || !mpLoopCloser->isFinished() || mpLoopCloser->isRunningGBA())
     {
         usleep(5000);
     }
 
-    if(mpViewer)
-        pangolin::BindToContext("ORB-SLAM2: Map Viewer");
+    // Edge-SLAM: just to make sure all threads have stopped
+    usleep(5000);
 }
 
+// Edge-SLAM: disabled
+/*
 void System::SaveTrajectoryTUM(const string &filename)
 {
     cout << endl << "Saving camera trajectory to " << filename << " ..." << endl;
@@ -377,9 +450,10 @@ void System::SaveTrajectoryTUM(const string &filename)
     }
     f.close();
     cout << endl << "trajectory saved!" << endl;
-}
+}*/
 
 
+// Edge-SLAM: server
 void System::SaveKeyFrameTrajectoryTUM(const string &filename)
 {
     cout << endl << "Saving keyframe trajectory to " << filename << " ..." << endl;
@@ -416,6 +490,8 @@ void System::SaveKeyFrameTrajectoryTUM(const string &filename)
     cout << endl << "trajectory saved!" << endl;
 }
 
+// Edge-SLAM: disabled
+/*
 void System::SaveTrajectoryKITTI(const string &filename)
 {
     cout << endl << "Saving camera trajectory to " << filename << " ..." << endl;
@@ -469,20 +545,23 @@ void System::SaveTrajectoryKITTI(const string &filename)
     }
     f.close();
     cout << endl << "trajectory saved!" << endl;
-}
+}*/
 
+// Edge-SLAM: client
 int System::GetTrackingState()
 {
     unique_lock<mutex> lock(mMutexState);
     return mTrackingState;
 }
 
+// Edge-SLAM: client
 vector<MapPoint*> System::GetTrackedMapPoints()
 {
     unique_lock<mutex> lock(mMutexState);
     return mTrackedMapPoints;
 }
 
+// Edge-SLAM: client
 vector<cv::KeyPoint> System::GetTrackedKeyPointsUn()
 {
     unique_lock<mutex> lock(mMutexState);
