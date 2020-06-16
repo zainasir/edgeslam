@@ -32,24 +32,25 @@ see
 [Dependencies.md](https://github.com/droneslab/edgeslam/blob/master/Dependencies.md).
 
 If you use Edge-SLAM in an academic work, please cite:
-    ```
-    @inproceedings{10.1145/3386901.3389033,
-    author = {Ali, Ali J. Ben and Hashemifar, Zakieh Sadat and Dantu, Karthik},
-    title = {Edge-SLAM: Edge-Assisted Visual Simultaneous Localization and Mapping},
-    year = {2020},
-    isbn = {9781450379540},
-    publisher = {Association for Computing Machinery},
-    address = {New York, NY, USA},
-    url = {https://doi.org/10.1145/3386901.3389033},
-    doi = {10.1145/3386901.3389033},
-    booktitle = {Proceedings of the 18th International Conference on Mobile Systems, Applications, and Services},
-    pages = {325–337},
-    numpages = {13},
-    keywords = {visual simultaneous localization and mapping, mapping, localization, split architecture, edge computing, mobile systems},
-    location = {Toronto, Ontario, Canada},
-    series = {MobiSys ’20}
-    }
-    ```
+
+```
+@inproceedings{10.1145/3386901.3389033,
+author = {Ali, Ali J. Ben and Hashemifar, Zakieh Sadat and Dantu, Karthik},
+title = {Edge-SLAM: Edge-Assisted Visual Simultaneous Localization and Mapping},
+year = {2020},
+isbn = {9781450379540},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+url = {https://doi.org/10.1145/3386901.3389033},
+doi = {10.1145/3386901.3389033},
+booktitle = {Proceedings of the 18th International Conference on Mobile Systems, Applications, and Services},
+pages = {325–337},
+numpages = {13},
+keywords = {visual simultaneous localization and mapping, mapping, localization, split architecture, edge computing, mobile systems},
+location = {Toronto, Ontario, Canada},
+series = {MobiSys ’20}
+}
+```
 
 ## Usage
 
@@ -63,7 +64,7 @@ If you use Edge-SLAM in an academic work, please cite:
   devices and make sure both devices have the same Boost version.
 
 * Our testing setup:
-  * We mostly run Edge-SLAM using the RGB-D/Stereo dataset using the ROS examples.
+  * We run Edge-SLAM using the RGB-D/Stereo dataset using the ROS examples.
   * Ubuntu 18.04 LTS.
   * OpenCV 3.4.2.
   * Boost 1.65.1.
@@ -73,28 +74,35 @@ If you use Edge-SLAM in an academic work, please cite:
 ### Building Edge-SLAM
 
 * Clone the repository
+
     ```
     git clone https://github.com/droneslab/edgeslam.git
     ```
+    
 * Run the build script
+
     ```
     cd edgeslam
     chmod +x build.sh
     ./build.sh
     ```
-This will create **libEdge_****SLAM.so**  at **lib** folder and the executables
-**mono_****tum**, **mono_****kitti**, **mono_****euroc**, **rgbd_****tum**,
-**stereo_****kitti**, and **stereo_****euroc** in **Examples** folder.
+
+This will create **libEdge_SLAM.so** at **lib** folder and the executables
+**mono_tum**, **mono_kitti**, **mono_euroc**, **rgbd_tum**,
+**stereo_kitti**, and **stereo_euroc** in **Examples** folder.
 
 * To build ROS examples
-  * Add the path including **Examples/ROS/Edge_****SLAM** to the
+  * Add the path including **Examples/ROS/Edge_SLAM** to the
     `ROS_PACKAGE_PATH` environment variable. Open `.bashrc` file and add at the
-    end the following line. Replace PATH by the folder where you cloned
-    Edge-SLAM:
+    end the following line. Replace `PATH` by the folder where you cloned
+    Edge-SLAM
+    
         ```
         export ROS_PACKAGE_PATH=${ROS_PACKAGE_PATH}:PATH/edgeslam/Examples/ROS
         ```
+        
   * Run the ROS build script
+  
         ```
         chmod +x build_ros.sh
         ./build_ros.sh
@@ -106,24 +114,32 @@ This will create **libEdge_****SLAM.so**  at **lib** folder and the executables
   [freiburg2_desk](https://vision.in.tum.de/rgbd/dataset/freiburg2/rgbd_dataset_freiburg2_desk.bag)
 * On mobile device
   * Open a new terminal window, navigate to project root directory, and run
+  
         ```
         roscore
         ```
+        
   * Open a second terminal window, navigate to project root directory, and run
+  
         ```
         cd Examples/ROS/Edge_SLAM/
         rosrun Edge_SLAM RGBD ../../../Vocabulary/ORBvoc.txt ../../RGB-D/TUM2.yaml client
         ```
+        
 * On edge device
   * Open a new terminal window, navigate to project root directory, and run
+  
         ```
         roscore
         ```
+        
   * Open a second terminal window, navigate to project root directory, and run
+  
         ```
         cd Examples/ROS/Edge_SLAM/
         rosrun Edge_SLAM RGBD ../../../Vocabulary/ORBvoc.txt ../../RGB-D/TUM2.yaml server
         ```
+        
 * When Edge-SLAM is running on both devices, you will be asked in the Edge-SLAM
   terminal to enter IP and port numbers to setup the network connections.
   Edge-SLAM uses three TCP connections. First connection transmits keyframes,
@@ -156,7 +172,6 @@ This will create **libEdge_****SLAM.so**  at **lib** folder and the executables
       receive data.
 * On the mobile device, open a third terminal window, navigate to project root
   directory, and run the bag file
-      ```
-      rosbag play ./rgbd_dataset_freiburg2_desk.bag /camera/rgb/image_color:=/camera/rgb/image_raw /camera/depth/image:=/camera/depth_registered/image_raw
-      ```
-
+    ```
+    rosbag play ./rgbd_dataset_freiburg2_desk.bag /camera/rgb/image_color:=/camera/rgb/image_raw /camera/depth/image:=/camera/depth_registered/image_raw
+    ```
