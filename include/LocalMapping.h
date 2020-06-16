@@ -26,9 +26,18 @@
 #include "LoopClosing.h"
 #include "Tracking.h"
 #include "KeyFrameDatabase.h"
-
 #include <mutex>
 
+// Edge-SLAM
+#include "ORBVocabulary.h"
+#include <unordered_set>
+#include <stack>
+
+// Edge-SLAM: TCP imports
+#include <TcpSocket.h>
+#include "concurrentqueue.h"
+#include "blockingconcurrentqueue.h"
+#include <thread>
 
 namespace ORB_SLAM2
 {
@@ -40,7 +49,8 @@ class Map;
 class LocalMapping
 {
 public:
-    LocalMapping(Map* pMap, const float bMonocular);
+    // Edge-SLAM: added settings file path
+    LocalMapping(Map* pMap, KeyFrameDatabase* pKFDB, ORBVocabulary* pVoc, const string &strSettingPath, const float bMonocular);
 
     void SetLoopCloser(LoopClosing* pLoopCloser);
 
@@ -72,7 +82,36 @@ public:
         return mlNewKeyFrames.size();
     }
 
+    // Edge-SLAM
+    void Reset();
+
+    // Edge-SLAM: TCP
+    void static tcp_receive(moodycamel::ConcurrentQueue<std::string>* messageQueue, TcpSocket* socketObject, unsigned int maxQueueSize, std::string name);
+    void static tcp_send(moodycamel::BlockingConcurrentQueue<std::string>* messageQueue, TcpSocket* socketObject, std::string name);
+
 protected:
+    // Edge-SLAM: measure
+    static std::chrono::high_resolution_clock::time_point msLastMUStart;
+    static std::chrono::high_resolution_clock::time_point msLastMUStop;
+
+    // Edge-SLAM: map update
+    void keyframeCallback(const std::string& msg);
+    void frameCallback(const std::string& msg);
+    bool NeedNewKeyFrame(KeyFrame* pKF);
+    void sendLocalMapUpdate();
+    const static int MAP_FREQ;  // Set to: after how many ms from last map update, a new map update should be sent
+    const static int KF_NUM;    // Set to: how many keyframes should a map update consist of
+    const static int CONN_KF;   // Set to: for every keyframe, how many connected keyframes should be included in a map update
+    static bool msNewKFFlag;    // Flag used to only send map update when a new keyframe is received
+    static stack<long unsigned int> msLatestKFsId;  // Stack to keep latest keyframes ids
+
+    // Edge-SLAM
+    //New KeyFrame rules (according to fps)
+    int mMinFrames;
+    int mMaxFrames;
+    // Similar to the one in Tracking.h
+    unsigned int mnLastKeyFrameId;
+    bool CheckReset();
 
     bool CheckNewKeyFrames();
     void ProcessNewKeyFrame();
@@ -99,7 +138,13 @@ protected:
     bool mbFinished;
     std::mutex mMutexFinish;
 
+    // Edge-SLAM
+    ORBVocabulary* mpORBVocabulary;
+
     Map* mpMap;
+
+    // Edge-SLAM
+    KeyFrameDatabase* mpKeyFrameDB;
 
     LoopClosing* mpLoopCloser;
     Tracking* mpTracker;
@@ -121,6 +166,27 @@ protected:
 
     bool mbAcceptKeyFrames;
     std::mutex mMutexAccept;
+
+    // Edge-SLAM: thread variables
+    std::thread* keyframe_thread ;
+    std::thread* frame_thread ;
+    std::thread* map_thread ;
+    // Edge-SLAM: queue declarations
+    moodycamel::ConcurrentQueue<std::string> keyframe_queue;
+    moodycamel::ConcurrentQueue<std::string> frame_queue;
+    moodycamel::BlockingConcurrentQueue<std::string> map_queue;
+    // Edge-SLAM: TcpSocket Objects
+    TcpSocket* keyframe_socket;
+    TcpSocket* frame_socket;
+    TcpSocket* map_socket;
+
+    // Edge-SLAM: relocalization
+    static vector<KeyFrame*> vpCandidateKFs;
+    static unordered_set<long unsigned int> usCandidateKFsId;
+    static bool msRelocStatus;      // Set to true when relocalization is happening
+    static bool msRelocNewFFlag;    // Flag used to only send reloc map update when a new reloc frame is received
+    const static int RELOC_FREQ;    // Set to: after how many ms from last reloc map, a new map should be sent
+    void sendRelocMapUpdate();
 };
 
 } //namespace ORB_SLAM

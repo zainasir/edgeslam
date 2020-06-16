@@ -59,15 +59,23 @@ public:
 
     void clear();
 
+    // Edge-SLAM
+    KeyFrame* RetrieveKeyFrame(long int id);
+    MapPoint* RetrieveMapPoint(long int id, bool isTracking);
+
     vector<KeyFrame*> mvpKeyFrameOrigins;
 
     std::mutex mMutexMapUpdate;
+
+    // Edge-SLAM
+    std::mutex mMutexCallBackUpdate;
 
     // This avoid that two points are created simultaneously in separate threads (id conflict)
     std::mutex mMutexPointCreation;
 
 protected:
     std::set<MapPoint*> mspMapPoints;
+
     std::set<KeyFrame*> mspKeyFrames;
 
     std::vector<MapPoint*> mvpReferenceMapPoints;

@@ -22,21 +22,27 @@
 #ifndef TRACKING_H
 #define TRACKING_H
 
-#include<opencv2/core/core.hpp>
-#include<opencv2/features2d/features2d.hpp>
+#include <opencv2/core/core.hpp>
+#include <opencv2/features2d/features2d.hpp>
 
-#include"Viewer.h"
-#include"FrameDrawer.h"
-#include"Map.h"
-#include"LocalMapping.h"
-#include"LoopClosing.h"
-#include"Frame.h"
+#include "Viewer.h"
+#include "FrameDrawer.h"
+#include "Map.h"
+#include "LocalMapping.h"
+#include "LoopClosing.h"
+#include "Frame.h"
 #include "ORBVocabulary.h"
-#include"KeyFrameDatabase.h"
-#include"ORBextractor.h"
+#include "KeyFrameDatabase.h"
+#include "ORBextractor.h"
 #include "Initializer.h"
 #include "MapDrawer.h"
 #include "System.h"
+
+// Edge-SLAM: imports for TCP
+#include <TcpSocket.h>
+#include "concurrentqueue.h"
+#include "blockingconcurrentqueue.h"
+#include <thread>
 
 #include <mutex>
 
@@ -51,7 +57,7 @@ class LoopClosing;
 class System;
 
 class Tracking
-{  
+{
 
 public:
     Tracking(System* pSys, ORBVocabulary* pVoc, FrameDrawer* pFrameDrawer, MapDrawer* pMapDrawer, Map* pMap,
@@ -76,7 +82,6 @@ public:
 
 
 public:
-
     // Tracking states
     enum eTrackingState{
         SYSTEM_NOT_READY=-1,
@@ -115,7 +120,37 @@ public:
 
     void Reset();
 
+    // Edge-SLAM
+    void MUReset();
+
+    // Edge-SLAM: TCP
+    void static tcp_receive(moodycamel::ConcurrentQueue<std::string>* messageQueue, TcpSocket* socketObject, unsigned int maxQueueSize, std::string name);
+    void static tcp_send(moodycamel::BlockingConcurrentQueue<std::string>* messageQueue, TcpSocket* socketObject, std::string name);
+
+    // Edge-SLAM: added destructor to destroy all connections on object termination
+    ~Tracking();
+
 protected:
+    // Edge-SLAM: measure
+    static std::chrono::high_resolution_clock::time_point msRelocLastMapUpdateStart;
+    static std::chrono::high_resolution_clock::time_point msRelocLastMapUpdateStop;
+    static std::chrono::high_resolution_clock::time_point msLastKeyFrameStart;
+    static std::chrono::high_resolution_clock::time_point msLastKeyFrameStop;
+
+    // Edge-SLAM: map update variables and functions
+    void mapCallback(const std::string& msg);
+    static vector<std::string> mapVec;          // Vector to hold local-map update
+    static int mapCallbackCount;
+    const static unsigned int TIME_KF;          // Set to: after how many ms from last created keyframe should a map update be accepted
+    static unsigned int mnMapUpdateLastKFId;    // Set to: last keyframe id in map update
+    static bool mapUpToDate;                    // Set to: true as long as map update is done and no new keyframes has been created in tracking
+    const static unsigned int LOCAL_MAP_SIZE;   // Set to: number of keyframes in map after which the TIME_KF should be decreased
+    static bool refKFSet;                       // ReferenceKF didn't change after map update
+                                                // Set to: true to not skip next frame after update
+
+    // Edge-SLAM: relocalization
+    static bool msRelocStatus;
+    const static int RELOC_FREQ;                // Set to: after how many ms from last received reloc map update, a new reloc frame should be sent
 
     // Main tracking function. It is independent of the input sensor.
     void Track();
@@ -141,8 +176,8 @@ protected:
     bool TrackLocalMap();
     void SearchLocalPoints();
 
-    bool NeedNewKeyFrame();
-    void CreateNewKeyFrame();
+    int NeedNewKeyFrame();
+    void CreateNewKeyFrame(int needNKF);
 
     // In case of performing only localization, this flag is true when there are no matches to
     // points in the map. Still tracking will continue if there are enough matches with temporal points.
@@ -169,10 +204,10 @@ protected:
     KeyFrame* mpReferenceKF;
     std::vector<KeyFrame*> mvpLocalKeyFrames;
     std::vector<MapPoint*> mvpLocalMapPoints;
-    
+
     // System
     System* mpSystem;
-    
+
     //Drawers
     Viewer* mpViewer;
     FrameDrawer* mpFrameDrawer;
@@ -214,6 +249,19 @@ protected:
     bool mbRGB;
 
     list<MapPoint*> mlpTemporalPoints;
+
+    // Edge-SLAM: thread variables
+    std::thread* keyframe_thread ;
+    std::thread* frame_thread ;
+    std::thread* map_thread ;
+    // Edge-SLAM: queue declarations
+    moodycamel::BlockingConcurrentQueue<std::string> keyframe_queue;
+    moodycamel::BlockingConcurrentQueue<std::string> frame_queue;
+    moodycamel::ConcurrentQueue<std::string> map_queue;
+    // Edge-SLAM: TcpSocket Objects
+    TcpSocket* keyframe_socket;
+    TcpSocket* frame_socket;
+    TcpSocket* map_socket;
 };
 
 } //namespace ORB_SLAM

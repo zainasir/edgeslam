@@ -29,6 +29,12 @@
 #include "Frame.h"
 #include "KeyFrameDatabase.h"
 
+// Edge-SLAM
+#include "SerializeObject.h"
+#include <boost/archive/text_oarchive.hpp>
+#include <boost/archive/text_iarchive.hpp>
+#include <boost/serialization/set.hpp>
+
 #include <mutex>
 
 
@@ -42,7 +48,49 @@ class KeyFrameDatabase;
 
 class KeyFrame
 {
+// Edge-SLAM
+private:
+        friend class boost::serialization::access;
+        //serialize LightKeyFrame class
+        template<class Archive>
+        void serialize(Archive & ar, const unsigned int version){
+                ar &  mnRelocQuery; ar &  mnRelocWords; ar &  mRelocScore;
+                //ar &  mTcwGBA; ar &  mTcwBefGBA;
+                ar &  mnBAGlobalForKF;
+                ar &  mnId; ar &  mnFrameId; ar &  mTimeStamp; ar &  mnGridCols;
+                ar &  mnGridRows; ar &  mfGridElementHeightInv; ar &  mfGridElementWidthInv;
+                ar &  mnTrackReferenceForFrame;ar &  mnFuseTargetForKF; ar &  mnBALocalForKF;
+                //ar &  mnBAFixedForKF; ar &  mnLoopQuery; ar &  mnLoopWords; ar &  mLoopScore;
+                ar &  fx; ar &  fy; ar &  cx; ar & cy; ar & invfx; ar & invfy; ar & mbf;
+                ar &  mb; ar & mThDepth; ar & N;
+                ar &  mvKeys; ar &  mvKeysUn; ar & mvuRight;ar & mvDepth; ar & mDescriptors;
+                ar &  mBowVec;
+                ar &  mFeatVec;
+                //ar &  mTcp;
+                ar & mnScaleLevels;
+                ar & mfScaleFactor; ar & mfLogScaleFactor; ar & mvScaleFactors;
+                ar & mvLevelSigma2; ar &  mvInvLevelSigma2;
+                ar & mnMinX; ar & mnMinY; ar & mnMaxX; ar & mnMaxY; ar & mK;
+                ar & Tcw & Twc & Ow & Cw;
+                ar & mvpMapPoints;
+                ar & mGrid;
+                //ar & mConnectedKeyFrameWeights;
+                ar & mvpOrderedConnectedKeyFrames_ids;
+                ar & mvOrderedWeights;
+                ar & mbFirstConnection;
+                ar & mpParent_id;
+                ar & mspChildrens_ids;// & mspLoopEdges;
+                ar & mbNotErase & mbToBeErased & mbBad;
+                ar & mHalfBaseline;
+                ar & mNeedNKF;
+                ar & mPassedF;
+                ar & mResetKF;
+        };
+
 public:
+    // Edge-SLAM
+    KeyFrame(){}
+
     KeyFrame(Frame &F, Map* pMap, KeyFrameDatabase* pKFDB);
 
     // Pose functions
@@ -68,6 +116,9 @@ public:
     std::vector<KeyFrame*> GetCovisiblesByWeight(const int &w);
     int GetWeight(KeyFrame* pKF);
 
+    // Edge-SLAM
+    void ReconstructConnections();
+
     // Spanning tree functions
     void AddChild(KeyFrame* pKF);
     void EraseChild(KeyFrame* pKF);
@@ -75,6 +126,10 @@ public:
     std::set<KeyFrame*> GetChilds();
     KeyFrame* GetParent();
     bool hasChild(KeyFrame* pKF);
+
+    // Edge-SLAM
+    std::string GetParentId();
+    std::set<long int> GetChildsIds();
 
     // Loop Edges
     void AddLoopEdge(KeyFrame* pKF);
@@ -116,21 +171,43 @@ public:
         return pKF1->mnId<pKF2->mnId;
     }
 
+    // Edge-SLAM
+    void setORBVocab(ORBVocabulary* pVoc){mpORBvocabulary = pVoc;}
+    void setMapPointer(Map* pMap){mpMap = pMap;}
+    void setKeyFrameDatabase(KeyFrameDatabase* KeyFrameDB){mpKeyFrameDB = KeyFrameDB;}
+
+    // Edge-SLAM: mNeedNKF, mPassedF, mResetKF setter/getter functions
+    void SetNeedNKF(int needNKF);
+    void SetPassedF(bool passedF);
+    void SetResetKF(bool resetKF);
+    int GetNeedNKF();
+    bool GetPassedF();
+    bool GetResetKF();
 
     // The following variables are accesed from only 1 thread or never change (no mutex needed).
 public:
 
     static long unsigned int nNextId;
     long unsigned int mnId;
-    const long unsigned int mnFrameId;
 
-    const double mTimeStamp;
+    // Edge-SLAM
+    //const long unsigned int mnFrameId;
+    long unsigned int mnFrameId;
 
+    // Edge-SLAM
+    //const double mTimeStamp;
+    double mTimeStamp;
+
+    // Edge-SLAM
     // Grid (to speed up feature matching)
-    const int mnGridCols;
-    const int mnGridRows;
-    const float mfGridElementWidthInv;
-    const float mfGridElementHeightInv;
+    //const int mnGridCols;
+    //const int mnGridRows;
+    //const float mfGridElementWidthInv;
+    //const float mfGridElementHeightInv;
+    int mnGridCols;
+    int mnGridRows;
+    float mfGridElementWidthInv;
+    float mfGridElementHeightInv;
 
     // Variables used by the tracking
     long unsigned int mnTrackReferenceForFrame;
@@ -153,18 +230,28 @@ public:
     cv::Mat mTcwBefGBA;
     long unsigned int mnBAGlobalForKF;
 
+    // Edge-SLAM
     // Calibration parameters
-    const float fx, fy, cx, cy, invfx, invfy, mbf, mb, mThDepth;
+    //const float fx, fy, cx, cy, invfx, invfy, mbf, mb, mThDepth;
+    float fx, fy, cx, cy, invfx, invfy, mbf, mb, mThDepth;
 
+    // Edge-SLAM
     // Number of KeyPoints
-    const int N;
+    //const int N;
+    int N;
 
+    // Edge-SLAM
     // KeyPoints, stereo coordinate and descriptors (all associated by an index)
-    const std::vector<cv::KeyPoint> mvKeys;
-    const std::vector<cv::KeyPoint> mvKeysUn;
-    const std::vector<float> mvuRight; // negative value for monocular points
-    const std::vector<float> mvDepth; // negative value for monocular points
-    const cv::Mat mDescriptors;
+    //const std::vector<cv::KeyPoint> mvKeys;
+    //const std::vector<cv::KeyPoint> mvKeysUn;
+    //const std::vector<float> mvuRight; // negative value for monocular points
+    //const std::vector<float> mvDepth; // negative value for monocular points
+    //const cv::Mat mDescriptors;
+    std::vector<cv::KeyPoint> mvKeys;
+    std::vector<cv::KeyPoint> mvKeysUn;
+    std::vector<float> mvuRight; // negative value for monocular points
+    std::vector<float> mvDepth; // negative value for monocular points
+    cv::Mat mDescriptors;
 
     //BoW
     DBoW2::BowVector mBowVec;
@@ -173,21 +260,33 @@ public:
     // Pose relative to parent (this is computed when bad flag is activated)
     cv::Mat mTcp;
 
+    // Edge-SLAM
     // Scale
-    const int mnScaleLevels;
-    const float mfScaleFactor;
-    const float mfLogScaleFactor;
-    const std::vector<float> mvScaleFactors;
-    const std::vector<float> mvLevelSigma2;
-    const std::vector<float> mvInvLevelSigma2;
+    //const int mnScaleLevels;
+    //const float mfScaleFactor;
+    //const float mfLogScaleFactor;
+    //const std::vector<float> mvScaleFactors;
+    //const std::vector<float> mvLevelSigma2;
+    //const std::vector<float> mvInvLevelSigma2;
+    int mnScaleLevels;
+    float mfScaleFactor;
+    float mfLogScaleFactor;
+    std::vector<float> mvScaleFactors;
+    std::vector<float> mvLevelSigma2;
+    std::vector<float> mvInvLevelSigma2;
 
+    // Edge-SLAM
     // Image bounds and calibration
-    const int mnMinX;
-    const int mnMinY;
-    const int mnMaxX;
-    const int mnMaxY;
-    const cv::Mat mK;
-
+    //const int mnMinX;
+    //const int mnMinY;
+    //const int mnMaxX;
+    //const int mnMaxY;
+    //const cv::Mat mK;
+    int mnMinX;
+    int mnMinY;
+    int mnMaxX;
+    int mnMaxY;
+    cv::Mat mK;
 
     // The following variables need to be accessed trough a mutex to be thread safe.
 protected:
@@ -213,20 +312,32 @@ protected:
     std::vector<KeyFrame*> mvpOrderedConnectedKeyFrames;
     std::vector<int> mvOrderedWeights;
 
+    // Edge-SLAM
+    std::vector<long int> mvpOrderedConnectedKeyFrames_ids;
+
     // Spanning Tree and Loop Edges
     bool mbFirstConnection;
     KeyFrame* mpParent;
     std::set<KeyFrame*> mspChildrens;
     std::set<KeyFrame*> mspLoopEdges;
 
+    // Edge-SLAM
+    std::set<long int> mspChildrens_ids;
+    unsigned long int mpParent_id;
+
     // Bad flags
     bool mbNotErase;
     bool mbToBeErased;
-    bool mbBad;    
+    bool mbBad;
 
     float mHalfBaseline; // Only for visualization
 
     Map* mpMap;
+
+    // Edge-SLAM: these variables are either accesed from tracking thread on mobile-side or local-mapping thread on edge-side, thus no mutex needed
+    int mNeedNKF;   // Flag to save the status of checking the keyframe selection conditions
+    bool mPassedF;  // Flag to pass the status of one of the keyframe selection conditions to the edge
+    bool mResetKF;  // Flag to pass reset signal to the edge
 
     std::mutex mMutexPose;
     std::mutex mMutexConnections;

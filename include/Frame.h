@@ -32,6 +32,12 @@
 
 #include <opencv2/opencv.hpp>
 
+// Edge-SLAM
+#include "SerializeObject.h"
+#include <boost/archive/text_oarchive.hpp>
+#include <boost/archive/text_iarchive.hpp>
+#include <boost/serialization/set.hpp>
+
 namespace ORB_SLAM2
 {
 #define FRAME_GRID_ROWS 48
@@ -42,6 +48,28 @@ class KeyFrame;
 
 class Frame
 {
+// Edge-SLAM
+private:
+        friend class boost::serialization::access;
+        //serialize LightFrame class
+        template<class Archive>
+        void serialize(Archive & ar, const unsigned int version){
+                ar &  mnId;
+                ar &  mTimeStamp;
+                ar &  mfGridElementHeightInv; ar &  mfGridElementWidthInv;
+                ar &  fx; ar &  fy; ar &  cx; ar & cy; ar & invfx; ar & invfy; ar & mbf;
+                ar &  mb; ar & mThDepth; ar & N;
+                ar &  mvKeys; ar &  mvKeysUn; ar & mvuRight;ar & mvDepth; ar & mDescriptors;
+                ar &  mBowVec;
+                ar &  mFeatVec;
+                ar & mnScaleLevels;
+                ar & mfScaleFactor; ar & mfLogScaleFactor; ar & mvScaleFactors;
+                ar & mvLevelSigma2; ar &  mvInvLevelSigma2;
+                ar & mnMinX; ar & mnMinY; ar & mnMaxX; ar & mnMaxY; ar & mK;
+                ar & mvpMapPoints;
+                ar & mGrid;
+        };
+
 public:
     Frame();
 
