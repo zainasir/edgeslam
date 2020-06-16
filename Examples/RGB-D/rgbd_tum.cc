@@ -28,6 +28,9 @@
 
 #include<System.h>
 
+// Edge-SLAM
+#include <string>
+
 using namespace std;
 
 void LoadImages(const string &strAssociationFilename, vector<string> &vstrImageFilenamesRGB,
@@ -35,106 +38,140 @@ void LoadImages(const string &strAssociationFilename, vector<string> &vstrImageF
 
 int main(int argc, char **argv)
 {
-    if(argc != 5)
+    // Edge-SLAM
+    if(argc < 4)
     {
-        cerr << endl << "Usage: ./rgbd_tum path_to_vocabulary path_to_settings path_to_sequence path_to_association" << endl;
+        cerr << endl << "Client Usage: ./rgbd_tum VOC_PATH SETTINGS_PATH RUN_TYPE(client|server) SEQUENCE_PATH ASSOCIATION_PATH" << endl;
+        cerr << endl << "Server Usage: ./rgbd_tum VOC_PATH SETTINGS_PATH RUN_TYPE(client|server)" << endl;
         return 1;
     }
 
-    // Retrieve paths to images
-    vector<string> vstrImageFilenamesRGB;
-    vector<string> vstrImageFilenamesD;
-    vector<double> vTimestamps;
-    string strAssociationFilename = string(argv[4]);
-    LoadImages(strAssociationFilename, vstrImageFilenamesRGB, vstrImageFilenamesD, vTimestamps);
-
-    // Check consistency in the number of images and depthmaps
-    int nImages = vstrImageFilenamesRGB.size();
-    if(vstrImageFilenamesRGB.empty())
+    // Edge-SLAM: check arguments
+    // Check run type and convert to lowercase
+    std::string RunType(argv[3]);
+    std::transform(RunType.begin(), RunType.end(), RunType.begin(), ::tolower);
+    if(RunType.compare("client") == 0)
     {
-        cerr << endl << "No images found in provided path." << endl;
-        return 1;
-    }
-    else if(vstrImageFilenamesD.size()!=vstrImageFilenamesRGB.size())
-    {
-        cerr << endl << "Different number of images for rgb and depth." << endl;
-        return 1;
-    }
-
-    // Create SLAM system. It initializes all system threads and gets ready to process frames.
-    ORB_SLAM2::System SLAM(argv[1],argv[2],ORB_SLAM2::System::RGBD,true);
-
-    // Vector for tracking time statistics
-    vector<float> vTimesTrack;
-    vTimesTrack.resize(nImages);
-
-    cout << endl << "-------" << endl;
-    cout << "Start processing sequence ..." << endl;
-    cout << "Images in the sequence: " << nImages << endl << endl;
-
-    // Main loop
-    cv::Mat imRGB, imD;
-    for(int ni=0; ni<nImages; ni++)
-    {
-        // Read image and depthmap from file
-        imRGB = cv::imread(string(argv[3])+"/"+vstrImageFilenamesRGB[ni],CV_LOAD_IMAGE_UNCHANGED);
-        imD = cv::imread(string(argv[3])+"/"+vstrImageFilenamesD[ni],CV_LOAD_IMAGE_UNCHANGED);
-        double tframe = vTimestamps[ni];
-
-        if(imRGB.empty())
+        // Edge-SLAM
+        if(argc != 6)
         {
-            cerr << endl << "Failed to load image at: "
-                 << string(argv[3]) << "/" << vstrImageFilenamesRGB[ni] << endl;
+            cerr << endl << "Client Usage: ./rgbd_tum VOC_PATH SETTINGS_PATH RUN_TYPE(client|server) SEQUENCE_PATH ASSOCIATION_PATH" << endl;
+            cerr << endl << "Server Usage: ./rgbd_tum VOC_PATH SETTINGS_PATH RUN_TYPE(client|server)" << endl;
             return 1;
         }
 
+        // Retrieve paths to images
+        vector<string> vstrImageFilenamesRGB;
+        vector<string> vstrImageFilenamesD;
+        vector<double> vTimestamps;
+        string strAssociationFilename = string(argv[5]);
+        LoadImages(strAssociationFilename, vstrImageFilenamesRGB, vstrImageFilenamesD, vTimestamps);
+
+        // Check consistency in the number of images and depthmaps
+        int nImages = vstrImageFilenamesRGB.size();
+        if(vstrImageFilenamesRGB.empty())
+        {
+            cerr << endl << "No images found in provided path." << endl;
+            return 1;
+        }
+        else if(vstrImageFilenamesD.size()!=vstrImageFilenamesRGB.size())
+        {
+            cerr << endl << "Different number of images for rgb and depth." << endl;
+            return 1;
+        }
+
+        // Edge-SLAM
+        // Create SLAM system. It initializes all system threads and gets ready to process frames.
+        ORB_SLAM2::System SLAM(argv[1],argv[2],RunType,ORB_SLAM2::System::RGBD,true);
+
+        // Vector for tracking time statistics
+        vector<float> vTimesTrack;
+        vTimesTrack.resize(nImages);
+
+        cout << endl << "-------" << endl;
+        cout << "Start processing sequence ..." << endl;
+        cout << "Images in the sequence: " << nImages << endl << endl;
+
+        // Main loop
+        cv::Mat imRGB, imD;
+        for(int ni=0; ni<nImages; ni++)
+        {
+            // Read image and depthmap from file
+            imRGB = cv::imread(string(argv[4])+"/"+vstrImageFilenamesRGB[ni],CV_LOAD_IMAGE_UNCHANGED);
+            imD = cv::imread(string(argv[4])+"/"+vstrImageFilenamesD[ni],CV_LOAD_IMAGE_UNCHANGED);
+            double tframe = vTimestamps[ni];
+
+            if(imRGB.empty())
+            {
+                cerr << endl << "Failed to load image at: "
+                    << string(argv[4]) << "/" << vstrImageFilenamesRGB[ni] << endl;
+                return 1;
+            }
+
 #ifdef COMPILEDWITHC11
-        std::chrono::steady_clock::time_point t1 = std::chrono::steady_clock::now();
+            std::chrono::steady_clock::time_point t1 = std::chrono::steady_clock::now();
 #else
-        std::chrono::monotonic_clock::time_point t1 = std::chrono::monotonic_clock::now();
+            std::chrono::monotonic_clock::time_point t1 = std::chrono::monotonic_clock::now();
 #endif
 
-        // Pass the image to the SLAM system
-        SLAM.TrackRGBD(imRGB,imD,tframe);
+            // Pass the image to the SLAM system
+            SLAM.TrackRGBD(imRGB,imD,tframe);
 
 #ifdef COMPILEDWITHC11
-        std::chrono::steady_clock::time_point t2 = std::chrono::steady_clock::now();
+            std::chrono::steady_clock::time_point t2 = std::chrono::steady_clock::now();
 #else
-        std::chrono::monotonic_clock::time_point t2 = std::chrono::monotonic_clock::now();
+            std::chrono::monotonic_clock::time_point t2 = std::chrono::monotonic_clock::now();
 #endif
 
-        double ttrack= std::chrono::duration_cast<std::chrono::duration<double> >(t2 - t1).count();
+            double ttrack= std::chrono::duration_cast<std::chrono::duration<double> >(t2 - t1).count();
 
-        vTimesTrack[ni]=ttrack;
+            vTimesTrack[ni]=ttrack;
 
-        // Wait to load the next frame
-        double T=0;
-        if(ni<nImages-1)
-            T = vTimestamps[ni+1]-tframe;
-        else if(ni>0)
-            T = tframe-vTimestamps[ni-1];
+            // Wait to load the next frame
+            double T=0;
+            if(ni<nImages-1)
+                T = vTimestamps[ni+1]-tframe;
+            else if(ni>0)
+                T = tframe-vTimestamps[ni-1];
 
-        if(ttrack<T)
-            usleep((T-ttrack)*1e6);
+            if(ttrack<T)
+                usleep((T-ttrack)*1e6);
+        }
+
+        // Edge-SLAM: split shutdown between client and server
+        // Stop all threads
+        SLAM.ClientShutdown();
+
+        // Tracking time statistics
+        sort(vTimesTrack.begin(),vTimesTrack.end());
+        float totaltime = 0;
+        for(int ni=0; ni<nImages; ni++)
+        {
+            totaltime+=vTimesTrack[ni];
+        }
+        cout << "-------" << endl << endl;
+        cout << "median tracking time: " << vTimesTrack[nImages/2] << endl;
+        cout << "mean tracking time: " << totaltime/nImages << endl;
     }
-
-    // Stop all threads
-    SLAM.Shutdown();
-
-    // Tracking time statistics
-    sort(vTimesTrack.begin(),vTimesTrack.end());
-    float totaltime = 0;
-    for(int ni=0; ni<nImages; ni++)
+    else if(RunType.compare("server") == 0)
     {
-        totaltime+=vTimesTrack[ni];
-    }
-    cout << "-------" << endl << endl;
-    cout << "median tracking time: " << vTimesTrack[nImages/2] << endl;
-    cout << "mean tracking time: " << totaltime/nImages << endl;
+        // Edge-SLAM
+        // Create SLAM system. It initializes all system threads and gets ready to process frames.
+        ORB_SLAM2::System SLAM(argv[1],argv[2],RunType,ORB_SLAM2::System::RGBD,true);
 
-    // Save camera trajectory
-    SLAM.SaveTrajectoryTUM("CameraTrajectory.txt");
-    SLAM.SaveKeyFrameTrajectoryTUM("KeyFrameTrajectory.txt");   
+        // Edge-SLAM: split shutdown between client and server
+        // Stop all threads
+        SLAM.ServerShutdown();
+
+        // Save camera trajectory
+        SLAM.SaveKeyFrameTrajectoryTUM("KeyFrameTrajectory.txt");
+    }
+    else
+    {
+        cerr << endl << "Client Usage: ./rgbd_tum VOC_PATH SETTINGS_PATH RUN_TYPE(client|server) SEQUENCE_PATH ASSOCIATION_PATH" << endl;
+        cerr << endl << "Server Usage: ./rgbd_tum VOC_PATH SETTINGS_PATH RUN_TYPE(client|server)" << endl;
+        return 1;
+    }
 
     return 0;
 }
@@ -165,3 +202,4 @@ void LoadImages(const string &strAssociationFilename, vector<string> &vstrImageF
         }
     }
 }
+

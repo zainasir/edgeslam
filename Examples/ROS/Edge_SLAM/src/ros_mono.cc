@@ -19,17 +19,20 @@
 */
 
 
-#include<iostream>
-#include<algorithm>
-#include<fstream>
-#include<chrono>
+#include <iostream>
+#include <algorithm>
+#include <fstream>
+#include <chrono>
 
-#include<ros/ros.h>
+#include <ros/ros.h>
 #include <cv_bridge/cv_bridge.h>
 
-#include<opencv2/core/core.hpp>
+#include <opencv2/core/core.hpp>
 
 #include"../../../include/System.h"
+
+// Edge-SLAM
+#include <string>
 
 using namespace std;
 
@@ -45,31 +48,49 @@ public:
 
 int main(int argc, char **argv)
 {
-    ros::init(argc, argv, "Mono");
+    // Edge-SLAM: check arguments
+    // Check run type and convert to lowercase
+    std::string RunType(argv[3]);
+    std::transform(RunType.begin(), RunType.end(), RunType.begin(), ::tolower);
+    ros::init(argc, argv, RunType);
     ros::start();
-
-    if(argc != 3)
+    if((argc != 4) || ((RunType.compare("client") != 0) && (RunType.compare("server") != 0)))
     {
-        cerr << endl << "Usage: rosrun ORB_SLAM2 Mono path_to_vocabulary path_to_settings" << endl;        
+        cerr << endl << "Usage: rosrun Edge_SLAM Mono VOC_PATH SETTINGS_PATH RUN_TYPE(client|server)" << endl;
         ros::shutdown();
         return 1;
-    }    
+    }
 
+    // Edge-SLAM
     // Create SLAM system. It initializes all system threads and gets ready to process frames.
-    ORB_SLAM2::System SLAM(argv[1],argv[2],ORB_SLAM2::System::MONOCULAR,true);
+    ORB_SLAM2::System SLAM(argv[1],argv[2],RunType,ORB_SLAM2::System::MONOCULAR,true);
 
-    ImageGrabber igb(&SLAM);
+    // Edge-SLAM: check client or server
+    if (RunType.compare("client") == 0)
+    {
+        ImageGrabber igb(&SLAM);
 
-    ros::NodeHandle nodeHandler;
-    ros::Subscriber sub = nodeHandler.subscribe("/camera/image_raw", 1, &ImageGrabber::GrabImage,&igb);
+        ros::NodeHandle nodeHandler;
 
-    ros::spin();
+        ros::Subscriber sub = nodeHandler.subscribe("/camera/image_raw", 1, &ImageGrabber::GrabImage,&igb);
 
-    // Stop all threads
-    SLAM.Shutdown();
+        ros::spin();
 
-    // Save camera trajectory
-    SLAM.SaveKeyFrameTrajectoryTUM("KeyFrameTrajectory.txt");
+        // Edge-SLAM: split shutdown between client and server
+        // Stop all threads
+        SLAM.ClientShutdown();
+    }
+    else
+    {
+        ros::spin();
+
+        // Edge-SLAM: split shutdown between client and server
+        // Stop all threads
+        SLAM.ServerShutdown();
+
+        // Save camera trajectory
+        SLAM.SaveKeyFrameTrajectoryTUM("KeyFrameTrajectory.txt");
+    }
 
     ros::shutdown();
 
@@ -92,5 +113,4 @@ void ImageGrabber::GrabImage(const sensor_msgs::ImageConstPtr& msg)
 
     mpSLAM->TrackMonocular(cv_ptr->image,cv_ptr->header.stamp.toSec());
 }
-
 

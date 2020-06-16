@@ -19,20 +19,23 @@
 */
 
 
-#include<iostream>
-#include<algorithm>
-#include<fstream>
-#include<chrono>
+#include <iostream>
+#include <algorithm>
+#include <fstream>
+#include <chrono>
 
-#include<ros/ros.h>
+#include <ros/ros.h>
 #include <cv_bridge/cv_bridge.h>
 #include <message_filters/subscriber.h>
 #include <message_filters/time_synchronizer.h>
 #include <message_filters/sync_policies/approximate_time.h>
 
-#include<opencv2/core/core.hpp>
+#include <opencv2/core/core.hpp>
 
 #include"../../../include/System.h"
+
+// Edge-SLAM
+#include <string>
 
 using namespace std;
 
@@ -48,36 +51,54 @@ public:
 
 int main(int argc, char **argv)
 {
-    ros::init(argc, argv, "RGBD");
+    // Edge-SLAM: check arguments
+    // Check run type and convert to lowercase
+    std::string RunType(argv[3]);
+    std::transform(RunType.begin(), RunType.end(), RunType.begin(), ::tolower);
+    ros::init(argc, argv, RunType);
     ros::start();
-
-    if(argc != 3)
+    if((argc != 4) || ((RunType.compare("client") != 0) && (RunType.compare("server") != 0)))
     {
-        cerr << endl << "Usage: rosrun ORB_SLAM2 RGBD path_to_vocabulary path_to_settings" << endl;        
+        cerr << endl << "Usage: rosrun Edge_SLAM RGBD VOC_PATH SETTINGS_PATH RUN_TYPE(client|server)" << endl;
         ros::shutdown();
         return 1;
-    }    
+    }
 
+    // Edge-SLAM
     // Create SLAM system. It initializes all system threads and gets ready to process frames.
-    ORB_SLAM2::System SLAM(argv[1],argv[2],ORB_SLAM2::System::RGBD,true);
+    ORB_SLAM2::System SLAM(argv[1],argv[2],RunType,ORB_SLAM2::System::RGBD,true);
 
-    ImageGrabber igb(&SLAM);
+    // Edge-SLAM: check client or server
+    if (RunType.compare("client") == 0)
+    {
+        ImageGrabber igb(&SLAM);
 
-    ros::NodeHandle nh;
+        ros::NodeHandle nh;
 
-    message_filters::Subscriber<sensor_msgs::Image> rgb_sub(nh, "/camera/rgb/image_raw", 1);
-    message_filters::Subscriber<sensor_msgs::Image> depth_sub(nh, "camera/depth_registered/image_raw", 1);
-    typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image> sync_pol;
-    message_filters::Synchronizer<sync_pol> sync(sync_pol(10), rgb_sub,depth_sub);
-    sync.registerCallback(boost::bind(&ImageGrabber::GrabRGBD,&igb,_1,_2));
+        message_filters::Subscriber<sensor_msgs::Image> rgb_sub(nh, "/camera/rgb/image_raw", 1);
+        message_filters::Subscriber<sensor_msgs::Image> depth_sub(nh, "/camera/depth_registered/image_raw", 1);
 
-    ros::spin();
+        typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image> sync_pol;
+        message_filters::Synchronizer<sync_pol> sync(sync_pol(10), rgb_sub,depth_sub);
+        sync.registerCallback(boost::bind(&ImageGrabber::GrabRGBD,&igb,_1,_2));
 
-    // Stop all threads
-    SLAM.Shutdown();
+        ros::spin();
 
-    // Save camera trajectory
-    SLAM.SaveKeyFrameTrajectoryTUM("KeyFrameTrajectory.txt");
+        // Edge-SLAM: split shutdown between client and server
+        // Stop all threads
+        SLAM.ClientShutdown();
+    }
+    else
+    {
+        ros::spin();
+
+        // Edge-SLAM: split shutdown between client and server
+        // Stop all threads
+        SLAM.ServerShutdown();
+
+        // Save camera trajectory
+        SLAM.SaveKeyFrameTrajectoryTUM("KeyFrameTrajectory.txt");
+    }
 
     ros::shutdown();
 
@@ -111,5 +132,4 @@ void ImageGrabber::GrabRGBD(const sensor_msgs::ImageConstPtr& msgRGB,const senso
 
     mpSLAM->TrackRGBD(cv_ptrRGB->image,cv_ptrD->image,cv_ptrRGB->header.stamp.toSec());
 }
-
 

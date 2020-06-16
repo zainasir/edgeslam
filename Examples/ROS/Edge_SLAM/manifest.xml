@@ -1,10 +1,10 @@
 <package>
-  <description brief="ORB_SLAM2">
+  <description brief="Edge_SLAM">
 
-     ORB_SLAM2
+     Edge_SLAM
 
   </description>
-  <author>Raul Mur-Artal</author>
+  <author>Ali J. Ben Ali, Zakieh Sadat Hashemifar, Karthik Dantu</author>
   <license>GPLv3</license>
   <depend package="roscpp"/>
   <depend package="tf"/>
@@ -14,6 +14,4 @@
 
 
 </package>
-
-
 
