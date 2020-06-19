@@ -75,17 +75,17 @@ series = {MobiSys ’20}
 
 * Clone the repository
 
-    ```
-    git clone https://github.com/droneslab/edgeslam.git
-    ```
+  ```
+  git clone https://github.com/droneslab/edgeslam.git
+  ```
     
 * Run the build script
 
-    ```
-    cd edgeslam
-    chmod +x build.sh
-    ./build.sh
-    ```
+  ```
+  cd edgeslam
+  chmod +x build.sh
+  ./build.sh
+  ```
 
 This will create **libEdge_SLAM.so** at **lib** folder and the executables
 **mono_tum**, **mono_kitti**, **mono_euroc**, **rgbd_tum**,
@@ -97,16 +97,16 @@ This will create **libEdge_SLAM.so** at **lib** folder and the executables
     end the following line. Replace `PATH` by the folder where you cloned
     Edge-SLAM
     
-        ```
-        export ROS_PACKAGE_PATH=${ROS_PACKAGE_PATH}:PATH/edgeslam/Examples/ROS
-        ```
+    ```
+    export ROS_PACKAGE_PATH=${ROS_PACKAGE_PATH}:PATH/edgeslam/Examples/ROS
+    ```
         
   * Run the ROS build script
-  
-        ```
-        chmod +x build_ros.sh
-        ./build_ros.sh
-        ```
+
+    ```
+    chmod +x build_ros.sh
+    ./build_ros.sh
+    ```
 
 ### Running Edge-SLAM
 
@@ -114,32 +114,32 @@ This will create **libEdge_SLAM.so** at **lib** folder and the executables
   [freiburg2_desk](https://vision.in.tum.de/rgbd/dataset/freiburg2/rgbd_dataset_freiburg2_desk.bag)
 * On mobile device
   * Open a new terminal window, navigate to project root directory, and run
-  
-        ```
-        roscore
-        ```
-        
+
+    ```
+    roscore
+    ```
+
   * Open a second terminal window, navigate to project root directory, and run
-  
-        ```
-        cd Examples/ROS/Edge_SLAM/
-        rosrun Edge_SLAM RGBD ../../../Vocabulary/ORBvoc.txt ../../RGB-D/TUM2.yaml client
-        ```
-        
+
+    ```
+    cd Examples/ROS/Edge_SLAM/
+    rosrun Edge_SLAM RGBD ../../../Vocabulary/ORBvoc.txt ../../RGB-D/TUM2.yaml client
+    ```
+
 * On edge device
   * Open a new terminal window, navigate to project root directory, and run
-  
-        ```
-        roscore
-        ```
-        
+
+    ```
+    roscore
+    ```
+
   * Open a second terminal window, navigate to project root directory, and run
-  
-        ```
-        cd Examples/ROS/Edge_SLAM/
-        rosrun Edge_SLAM RGBD ../../../Vocabulary/ORBvoc.txt ../../RGB-D/TUM2.yaml server
-        ```
-        
+
+    ```
+    cd Examples/ROS/Edge_SLAM/
+    rosrun Edge_SLAM RGBD ../../../Vocabulary/ORBvoc.txt ../../RGB-D/TUM2.yaml server
+    ```
+
 * When Edge-SLAM is running on both devices, you will be asked in the Edge-SLAM
   terminal to enter IP and port numbers to setup the network connections.
   Edge-SLAM uses three TCP connections. First connection transmits keyframes,
@@ -172,6 +172,6 @@ This will create **libEdge_SLAM.so** at **lib** folder and the executables
       receive data.
 * On the mobile device, open a third terminal window, navigate to project root
   directory, and run the bag file
-    ```
-    rosbag play ./rgbd_dataset_freiburg2_desk.bag /camera/rgb/image_color:=/camera/rgb/image_raw /camera/depth/image:=/camera/depth_registered/image_raw
-    ```
+  ```
+  rosbag play ./rgbd_dataset_freiburg2_desk.bag /camera/rgb/image_color:=/camera/rgb/image_raw /camera/depth/image:=/camera/depth_registered/image_raw
+  ```
