@@ -358,6 +358,9 @@ void Tracking::mapCallback(const std::string& msg)
                         }
                         else
                         {
+                            // Tracking id is already set, but whichThread is not set
+                            pMP->AssignId(true);
+
                             // Add keyframe's mappoint to tracking local-map
                             mpMap->AddMapPoint(pMP);
 
@@ -410,7 +413,6 @@ void Tracking::mapCallback(const std::string& msg)
         if(tKF->mnId == refId)
         {
             mpReferenceKF = tKF;
-            mLastFrame.mpReferenceKF = tKF;
             refKFSet = true;
         }
 
@@ -432,7 +434,6 @@ void Tracking::mapCallback(const std::string& msg)
             if(mpReferenceKF->mnId < vpKeyFrames[0]->mnId)
             {
                 mpReferenceKF = vpKeyFrames[0];
-                refKFSet = false;
             }
         }
 
@@ -458,7 +459,6 @@ void Tracking::mapCallback(const std::string& msg)
         if(mpReferenceKF->mnId < pKFCon->mnId)
         {
             mpReferenceKF = pKFCon;
-            refKFSet = false;
         }
 
         // Update other KF variables
@@ -473,7 +473,8 @@ void Tracking::mapCallback(const std::string& msg)
     // Edge-SLAM: debug
     cout << endl;
 
-    // Set current-frame RefKF
+    // Set last and current frame RefKF
+    mLastFrame.mpReferenceKF = mpReferenceKF;
     mCurrentFrame.mpReferenceKF = mpReferenceKF;
 
     // Get all map points in tracking local-map
@@ -512,7 +513,6 @@ void Tracking::mapCallback(const std::string& msg)
     }
 
     // We should update mvpLocalMapPoints for viewer
-    mvpLocalMapPoints.clear();
     for (unsigned int i = 0 ; i < mvpLocalMapPoints_ids.size(); i++)
     {
         MapPoint* pMP = mpMap->RetrieveMapPoint(mvpLocalMapPoints_ids[i], true);
@@ -1330,15 +1330,9 @@ bool Tracking::TrackWithMotionModel()
 {
     ORBmatcher matcher(0.9,true);
 
-    // Edge-SLAM: mLastFrame has a reference keyframe which may
-    // not necessarily be in current map, especially if there is lag
-    // so we are not updating its pose
-    // Edge-SLAM: to fix this, we check if last-frame RefKF is set or not after
-    // a map update
     // Update last frame pose according to its reference keyframe
     // Create "visual odometry" points if in Localization Mode
-    if(refKFSet)
-        UpdateLastFrame();
+    UpdateLastFrame();
 
     mCurrentFrame.SetPose(mVelocity*mLastFrame.mTcw);
 
@@ -2202,6 +2196,10 @@ void Tracking::MUReset()
         delete mpInitializer;
         mpInitializer = static_cast<Initializer*>(NULL);
     }
+
+    // Clear local MapPoints and KeyFrames
+    mvpLocalMapPoints.clear();
+    mvpLocalKeyFrames.clear();
 
     // Edge-SLAM
     cout << "Map update reset is complete" << endl;
