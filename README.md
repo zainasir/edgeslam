@@ -111,7 +111,7 @@ This will create **libEdge_SLAM.so** at **lib** folder and the executables
 ### Running Edge-SLAM
 
 * Download the following TUM RGB-D dataset bag file
-  [freiburg2_desk](https://vision.in.tum.de/rgbd/dataset/freiburg2/rgbd_dataset_freiburg2_desk.bag)
+  [freiburg2_desk](https://vision.in.tum.de/rgbd/dataset/freiburg2/rgbd_dataset_freiburg2_desk.bag), and adjust the `DepthMapFactor` in `Examples/RGB-D/TUM2.yaml` to `1.0`.
 * On mobile device
   * Open a new terminal window, navigate to project root directory, and run
 
