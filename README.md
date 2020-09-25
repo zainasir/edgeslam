@@ -13,6 +13,11 @@ computation-intensive modules to the edge. Thus, Edge-SLAM reduces resource
 usage on the mobile device and keeps it constant. Edge-SLAM is implemented on
 top of [ORB-SLAM2](https://github.com/raulmur/ORB_SLAM2).
 
+<iframe width="560" height="315" src="https://www.youtube.com/embed/lCDf07iQLQs" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+
+<iframe width="560" height="315" src="https://www.youtube.com/embed/LLsbALyANA8" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+
+<iframe width="560" height="315" src="https://www.youtube.com/embed/AeTK4EyfRZ0" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
 
 ## Publications
 
