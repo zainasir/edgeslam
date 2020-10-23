@@ -44,7 +44,7 @@ If you use Edge-SLAM in an academic work, please cite:
 
 ```
 @inproceedings{10.1145/3386901.3389033,
-author = {Ali, Ali J. Ben and Hashemifar, Zakieh Sadat and Dantu, Karthik},
+author = {Ben Ali, Ali J. and Hashemifar, Zakieh Sadat and Dantu, Karthik},
 title = {Edge-SLAM: Edge-Assisted Visual Simultaneous Localization and Mapping},
 year = {2020},
 isbn = {9781450379540},
@@ -55,9 +55,9 @@ doi = {10.1145/3386901.3389033},
 booktitle = {Proceedings of the 18th International Conference on Mobile Systems, Applications, and Services},
 pages = {325–337},
 numpages = {13},
-keywords = {visual simultaneous localization and mapping, mapping, localization, split architecture, edge computing, mobile systems},
+keywords = {mobile systems, mapping, visual simultaneous localization and mapping, split architecture, localization, edge computing},
 location = {Toronto, Ontario, Canada},
-series = {MobiSys ’20}
+series = {MobiSys '20}
 }
 ```
 
