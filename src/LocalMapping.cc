@@ -105,6 +105,8 @@ void LocalMapping::keyframeCallback(const std::string& msg)
     if(!SetNotStop(true))
         return;
 
+    cout << "Sofiya,keyframecallback begin" << endl;
+
     KeyFrame *tKF = new KeyFrame();
     try
     {
@@ -168,6 +170,7 @@ void LocalMapping::keyframeCallback(const std::string& msg)
     msRelocNewFFlag = false;
 
     SetNotStop(false);
+    cout << "Sofiya,keyframecallback end" << endl;
 }
 
 void LocalMapping::SetLoopCloser(LoopClosing* pLoopCloser)
@@ -279,6 +282,24 @@ void LocalMapping::Run()
                 // Local BA
                 if(mpMap->KeyFramesInMap()>2)
                     Optimizer::LocalBundleAdjustment(mpCurrentKeyFrame,&mbAbortBA, mpMap);
+
+                // print connected keyframes
+                cout << "Sofiya,New KF ID," << mpCurrentKeyFrame->mnId << endl;
+
+                auto allKFs = mpMap->GetAllKeyFrames();
+                for (auto mit=allKFs.begin(), mend=allKFs.end(); mit != mend; mit++){
+                    KeyFrame * currKF = *mit;
+                    cout << "Connected KFs," << currKF->mnId << ",(";
+                    auto connectedKFs = currKF->GetVectorCovisibleKeyFrames();
+
+                    for(auto nit=connectedKFs.begin(), nend=connectedKFs.end(); nit != nend; nit++) {
+                        cout << (*nit)->mnId << " ";
+                    }
+                    cout << ")" << endl;
+
+                }
+                cout << endl;
+
 
                 // Check redundant local Keyframes
                 KeyFrameCulling();
@@ -1529,6 +1550,7 @@ void LocalMapping::tcp_receive(moodycamel::ConcurrentQueue<std::string>* message
                 if(messageQueue->try_dequeue(data))
                 {
                     data.clear();
+                    cout << "log,LocalMapping::tcp_receive,dropped " << name << endl;
                 }
             }
             messageQueue->enqueue(msg);

@@ -207,7 +207,9 @@ Tracking::Tracking(System *pSys, ORBVocabulary* pVoc, FrameDrawer *pFrameDrawer,
 void Tracking::mapCallback(const std::string& msg)
 {
     // Get Map Mutex -> Map cannot be changed
+    cout << "Sofiya,mapcallback get lock" << endl;
     unique_lock<mutex> lock2(mpMap->mMutexCallBackUpdate);
+    cout << "Sofiya,mapcallback start" << endl;
 
     if(!msRelocStatus)
     {
@@ -617,10 +619,26 @@ cv::Mat Tracking::GrabImageRGBD(const cv::Mat &imRGB,const cv::Mat &imD, const d
     if((fabs(mDepthMapFactor-1.0f)>1e-5) || imDepth.type()!=CV_32F)
         imDepth.convertTo(imDepth,CV_32F,mDepthMapFactor);
 
+    auto trackstart = std::chrono::high_resolution_clock::now();
     mCurrentFrame = Frame(mImGray,imDepth,timestamp,mpORBextractorLeft,mpORBVocabulary,mK,mDistCoef,mbf,mThDepth);
+    auto extractionend = std::chrono::high_resolution_clock::now();
 
     Track();
+    
+    auto trackend = std::chrono::high_resolution_clock::now();
 
+    auto totald = std::chrono::duration_cast<std::chrono::milliseconds>(
+        trackend - trackstart
+    );
+    auto extractiond = std::chrono::duration_cast<std::chrono::milliseconds>(
+        extractionend - trackstart
+    );
+    auto trackd = std::chrono::duration_cast<std::chrono::milliseconds>(
+        trackend - extractionend
+    );
+
+
+    cout << "Sofiya,tracking total," << totald.count() << ",extraction only," << extractiond.count() << ",tracking only," << trackd.count() << endl;
     return mCurrentFrame.mTcw.clone();
 }
 
