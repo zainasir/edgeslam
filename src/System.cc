@@ -101,7 +101,7 @@ System::System(const string &strVocFile, const string &strSettingsFile, std::str
 
     if (RunType.compare("client") == 0){
         //Initialize the Viewer thread and launch
-        if(bUseViewer)
+        if(false) //bUseViewer)
         {
             mpViewer = new Viewer(this, mpFrameDrawer,mpMapDrawer,mpTracker,strSettingsFile);
             mptViewer = new thread(&Viewer::Run, mpViewer);

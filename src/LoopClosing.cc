@@ -758,6 +758,23 @@ void LoopClosing::RunGlobalBundleAdjustment(unsigned long nLoopKF)
         mbFinishedGBA = true;
         mbRunningGBA = false;
     }
+
+    // print connected keyframes
+    cout << "Sofiya,Global bundle adjustment, print connected kfs," << endl;
+
+    auto allKFs = mpMap->GetAllKeyFrames();
+    for (auto mit=allKFs.begin(), mend=allKFs.end(); mit != mend; mit++){
+        KeyFrame * currKF = *mit;
+        cout << "GBA Connected KFs," << currKF->mnId << ",(";
+        auto connectedKFs = currKF->GetVectorCovisibleKeyFrames();
+
+        for(auto nit=connectedKFs.begin(), nend=connectedKFs.end(); nit != nend; nit++) {
+            cout << (*nit)->mnId << " ";
+        }
+        cout << ")" << endl;
+
+    }
+    cout << endl;
 }
 
 void LoopClosing::RequestFinish()

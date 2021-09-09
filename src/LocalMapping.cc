@@ -1119,15 +1119,19 @@ bool LocalMapping::isFinished()
 bool LocalMapping::NeedNewKeyFrame(KeyFrame* pKF)
 {
     // If Local Mapping is freezed by a Loop Closure do not insert keyframes
-    if(isStopped() || stopRequested())
-        return false;
+    if(isStopped() || stopRequested()) {
+    	cout << "dropkf, loop closure busy" << endl;
+	    return false;
+    }
 
     // Edge-SLAM: part one of this condition was checked in CreateNewKeyFrame() in tracking on client
     // Edge-SLAM: now checking part two
     const int nKFs = mpMap->KeyFramesInMap();
     // Do not insert keyframes if not enough frames have passed from last relocalisation
-    if(!(pKF->GetPassedF()) && nKFs>mMaxFrames)
-        return false;
+    if(!(pKF->GetPassedF()) && nKFs>mMaxFrames) {
+    	cout << "dropkf, not enough frames passed" << endl;
+	    return false;
+    }
 
     // Local Mapping accept keyframes?
     bool bLocalMappingIdle = AcceptKeyFrames();
@@ -1162,17 +1166,24 @@ bool LocalMapping::NeedNewKeyFrame(KeyFrame* pKF)
             InterruptBA();
             if(!mbMonocular)
             {
-                if(KeyframesInQueue()<3)
+                if(KeyframesInQueue()<3) {
                     return true;
-                else
-                    return false;
+		}
+                else {
+                	cout << "dropkf, 1173" << endl;
+		    	return false;
+		}
             }
-            else
-                return false;
+            else {
+             	cout << "dropkf, 1178" << endl;
+		    return false;
+	    }
         }
     }
-    else
-        return false;
+    else {
+    	cout << "dropkf, 1184, c1a:" << c1a <<",c1b:" << c1b <<",pKF->GetNeedNKF() ==2:"<< (pKF->GetNeedNKF() == 2) << endl;
+	    return false;
+    }
 }
 
 // Edge-SLAM

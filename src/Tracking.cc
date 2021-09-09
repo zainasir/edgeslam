@@ -197,7 +197,7 @@ Tracking::Tracking(System *pSys, ORBVocabulary* pVoc, FrameDrawer *pFrameDrawer,
     getline(cin, server_port);
     map_socket = new TcpSocket(ip, std::stoi(port_number), server_ip, std::stoi(server_port));
     map_socket->sendConnectionRequest();
-    map_thread = new thread(&ORB_SLAM2::Tracking::tcp_receive, &map_queue, map_socket, 1, "map");
+    map_thread = new thread(&ORB_SLAM2::Tracking::tcp_receive, &map_queue, map_socket, 1000, "map");
 
     // Edge-SLAM: debug
     cout << "log,Tracking::Tracking,done" << endl;
@@ -234,6 +234,8 @@ void Tracking::mapCallback(const std::string& msg)
 
             // As the map adds more than LOCAL_MAP_SIZE keyframes, decrease TIME_KF to accept the update sooner
             unsigned int divRate = (unsigned)(TIME_KF/((mpMap->KeyFramesInMap()/LOCAL_MAP_SIZE)+1));
+            cout << "Sofiya,divRate," << divRate << endl;
+
             if(divRate < 50)
                 divRate = 0;
 
@@ -2333,6 +2335,7 @@ void Tracking::tcp_receive(moodycamel::ConcurrentQueue<std::string>* messageQueu
 
             // Edge-SLAM: debug
             cout << "log,Tracking::tcp_receive,received " << name << endl;
+	    cout << "Sofiya,map update queue size," << messageQueue->size_approx();
         }
     }
 }

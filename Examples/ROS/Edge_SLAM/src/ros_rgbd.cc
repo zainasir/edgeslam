@@ -25,6 +25,7 @@
 #include <chrono>
 
 #include <ros/ros.h>
+#include "std_msgs/Int8.h"
 #include <cv_bridge/cv_bridge.h>
 #include <message_filters/subscriber.h>
 #include <message_filters/time_synchronizer.h>
@@ -42,10 +43,12 @@ using namespace std;
 class ImageGrabber
 {
 public:
-    ImageGrabber(ORB_SLAM2::System* pSLAM):mpSLAM(pSLAM){}
+    ImageGrabber(ORB_SLAM2::System* pSLAM,ros::Publisher* tracking_status_pub
+		):mpSLAM(pSLAM),tracking_status_pub(tracking_status_pub){}
 
     void GrabRGBD(const sensor_msgs::ImageConstPtr& msgRGB,const sensor_msgs::ImageConstPtr& msgD);
 
+    ros::Publisher* tracking_status_pub;
     ORB_SLAM2::System* mpSLAM;
 };
 
@@ -71,12 +74,14 @@ int main(int argc, char **argv)
     // Edge-SLAM: check client or server
     if (RunType.compare("client") == 0)
     {
-        ImageGrabber igb(&SLAM);
-
         ros::NodeHandle nh;
 
-        message_filters::Subscriber<sensor_msgs::Image> rgb_sub(nh, "/camera/rgb/image_raw", 1);
-        message_filters::Subscriber<sensor_msgs::Image> depth_sub(nh, "/camera/depth_registered/image_raw", 1);
+        message_filters::Subscriber<sensor_msgs::Image> rgb_sub(nh, "/camera/rgb/image_raw", 1000);
+        message_filters::Subscriber<sensor_msgs::Image> depth_sub(nh, "/camera/depth_registered/image_raw", 1000);
+
+	ros::Publisher tracking_status_pub = nh.advertise<std_msgs::Int8>("tracking", 0);
+
+	ImageGrabber igb(&SLAM, &tracking_status_pub);
 
         typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image> sync_pol;
         message_filters::Synchronizer<sync_pol> sync(sync_pol(10), rgb_sub,depth_sub);
@@ -129,6 +134,10 @@ void ImageGrabber::GrabRGBD(const sensor_msgs::ImageConstPtr& msgRGB,const senso
         ROS_ERROR("cv_bridge exception: %s", e.what());
         return;
     }
+
+        std_msgs::Int8 msg;
+        msg.data = 1;
+        tracking_status_pub->publish(msg);
 
     mpSLAM->TrackRGBD(cv_ptrRGB->image,cv_ptrD->image,cv_ptrRGB->header.stamp.toSec());
 }
