@@ -47,6 +47,7 @@ RUN git clone https://github.com/stevenlovegrove/Pangolin.git \
 
 # Build Edge-SLAM
 WORKDIR /home
-RUN git clone https://github.com/droneslab/edgeslam.git \
+RUN git clone -b docker --single-branch https://github.com/zainasir/edgeslam.git \
     && cd edgeslam \
     && chmod +x build.sh \
+    && ./build.sh
