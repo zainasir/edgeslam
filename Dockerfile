@@ -36,14 +36,17 @@ RUN wget -O opencv.zip https://github.com/opencv/opencv/archive/${OPENCV_VERSION
     && make \
     && make install
 
-# Install Pangolin
+# Install Pangolin v0.5. Any later version leads to linking issues.
 WORKDIR /home
-RUN git clone https://github.com/stevenlovegrove/Pangolin.git \
+RUN git clone --recursive https://github.com/stevenlovegrove/Pangolin.git -b v0.5 \
     && cd Pangolin \
     && mkdir build \
     && cd build \
     && cmake .. \
     && make
+
+# Set up simlinks to Eigen3
+RUN ln -s /usr/include/eigen3/Eigen /usr/local/include/Eigen
 
 # Build Edge-SLAM
 WORKDIR /home
@@ -51,3 +54,6 @@ RUN git clone -b docker --single-branch https://github.com/zainasir/edgeslam.git
     && cd edgeslam \
     && chmod +x build.sh \
     && ./build.sh
+
+# Entrypoint into edgeslam
+WORKDIR /home/edgeslam
