@@ -184,3 +184,12 @@ This will create **libEdge_SLAM.so** at **lib** folder and the executables
   ```
   rosbag play ./rgbd_dataset_freiburg2_desk.bag /camera/rgb/image_color:=/camera/rgb/image_raw /camera/depth/image:=/camera/depth_registered/image_raw
   ```
+### Docker Setup
+* On the mobile device, disable access control to allow for X11 server connections.
+  ```
+  xhost +
+  ```
+* Start the mobile container
+  ```
+  docker run -it --rm -e DISPLAY=$DISPLAY -v /tmp/.X11-unix:/tmp/.X11-unix edgeslam
+  ```
