@@ -22,10 +22,10 @@ int main(int argc, char **argv) {
   if (RunType.compare("client") == 0) {
     // Open webcam and set 'q' as quit button
     cv::Mat image;
-    cv::nameWindow("Window", CV_WINDOW_AUTOSIZE);
+    cv::namedWindow("Window", CV_WINDOW_AUTOSIZE);
     cv::VideoCapture v_cap(0);
 
-    if (!cap.isOpened()) {
+    if (!v_cap.isOpened()) {
       cerr << endl << "Cannot open camera" << endl;
     }
 
