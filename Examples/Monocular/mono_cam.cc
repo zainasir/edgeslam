@@ -6,36 +6,34 @@
 #include <System.h>
 #include <string>
 
-using namespace std;
+int main() {
+  const std::string RTSP_URL = "rtsp://anafi.local/live";
 
-int main(int argc, char **argv) {
-  if (argc != 4) {
-    cerr << endl << "Client Usage: ./mono_cam VOC_PATH SETTINGS_PATH client" << endl;
-    cerr << endl << "Server Usage: ./mono_cam VOC_PATH SETTINGS_PATH server" << endl;
+#if WIN32
+  _putenv_s("OPENCV_FFMPEG_CAPTURE_OPTIONS", "rtsp_transport;udp");
+#else
+  setenv("OPENCV_FFMPEG_CAPTURE_OPTIONS", "rtsp_transport;udp", 1);
+#endif
+
+  cv::Mat frame;
+  cv::VideoCapture cap(RTSP_URL, cv::CAP_FFMPEG);
+
+  if (!cap.isOpened()) {
+    std::cout << "Cannot open RTSP stream" << std::endl;
+    return -1;
   }
 
-  // Check run type and conver to lowercase
-  std::string RunType(argv[3]);
-  std::transform(RunType.begin(), RunType.end(), RunType.begin(), ::tolower);
+  while (true) {
+    cap >> frame;
+    imshow("RTSP stream", frame);
 
-  // Run edgeslam for the client
-  if (RunType.compare("client") == 0) {
-    // Open webcam and set 'q' as quit button
-    cv::Mat image;
-    cv::namedWindow("Window", CV_WINDOW_AUTOSIZE);
-    cv::VideoCapture v_cap(0);
-
-    if (!v_cap.isOpened()) {
-      cerr << endl << "Cannot open camera" << endl;
-    }
-
-    while (true) {
-      v_cap >> image;
-      cv::imshow("Window", image);
-
-      if (cv::waitKey(10) >= 0) {
-	break;
-      }
+    if (waitKey(1) == 27) {
+      break;
     }
   }
+
+  cap.release();
+  destroyAllWindows();
+
+  return 0;
 }
