@@ -126,4 +126,4 @@ target_link_libraries(mono_euroc ${PROJECT_NAME})
 
 add_executable(mono_anafi
 Examples/Monocular/mono_anafi.cc)
-target_link_libraries(mono_anafir ${PROJECT_NAME})
+target_link_libraries(mono_anafi ${PROJECT_NAME})
