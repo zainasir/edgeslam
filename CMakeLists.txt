@@ -124,6 +124,6 @@ add_executable(mono_euroc
 Examples/Monocular/mono_euroc.cc)
 target_link_libraries(mono_euroc ${PROJECT_NAME})
 
-add_executable(mono_cam
-Examples/Monocular/mono_cam.cc)
-target_link_libraries(mono_cam ${PROJECT_NAME})
+add_executable(mono_anafi
+Examples/Monocular/mono_anafi.cc)
+target_link_libraries(mono_anafir ${PROJECT_NAME})
