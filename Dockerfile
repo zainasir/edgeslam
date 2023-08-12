@@ -10,6 +10,8 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
     libglew-dev \
     libgtk2.0-dev \
     pkg-config \
+    ffmpeg \
+    libavformat-dev \
     libavcodec-dev \
     libswscale-dev \
     python-dev \
