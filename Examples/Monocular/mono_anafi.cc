@@ -11,8 +11,9 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // Argument Checking
-  if (argc < 5) {
-    cerr << endl << "Client Usage: ./test VOC_PATH SETTINGS_PATH RUN_TYPE(client|server) VIDEO_PATH" << endl;
+  if (argc < 4) {
+    cerr << endl << "Client Usage: ./mono_anafi VOC_PATH SETTINGS_PATH RUN_TYPE(client|server) VIDEO_PATH" << endl;
+    cerr << endl << "Client Usage: ./mono_anafi VOC_PATH SETTINGS_PATH RUN_TYPE(client|server)" << endl;
     return -1;
   }
 
