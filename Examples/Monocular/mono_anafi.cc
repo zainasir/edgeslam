@@ -5,6 +5,7 @@
 #include <opencv2/core/core.hpp>
 #include <System.h>
 #include <string>
+#include <vector>
 
 using namespace std;
 
@@ -31,29 +32,101 @@ int main(int argc, char **argv) {
   // Client
   if (RunType.compare("client") == 0) {
     
-    // Set up SLAM system
-    //ORB_SLAM2::System SLAM(argv[1], argv[2], RunType, ORB_SLAM2::System::MONOCULAR, true);
+    // Save frames and timestamps in a vector
+    vector<cv::Mat> frames;
+    vector<double> timestamps;
 
-    while (1) {
+    for (int i = 0; i < videoCap.get(CV_CAP_PROP_FRAME_COUNT); i++) {
+      // Get frame
       cv::Mat currFrame;
       videoCap >> currFrame;
+      frames.push_back(currFrame);
 
-      if (currFrame.empty()) {
-	break;
-      }
-
-      else {
-	imshow("Video", currFrame);
-      }
-
-      char interruptKey = (char) cv::waitKey(25);
-      if (interruptKey == 27) {
-	break;
-      }
+      // Get timestamp
+      auto current_time = chrono::system_clock::now();
+      auto duration_in_seconds = chrono::duration<double>(current_time.time_since_epoch());
+      double num_seconds = duration_in_seconds.count();
+      timestamps.push_back(num_seconds);
     }
 
-    videoCap.release();
-    cv::destroyAllWindows();
+    int nImages = frames.size();
+
+    // Set up SLAM system
+    ORB_SLAM2::System SLAM(argv[1], argv[2], RunType, ORB_SLAM2::System::MONOCULAR, true);
+
+    // Vector for tracking time statistics
+    vector<float> vTimesTrack;
+    vTimesTrack.resize(nImages);
+
+    cout << endl << "--------" << endl;
+    cout << "Start processing sequence ..." << endl;
+    cout << "Images in the sequence: " << nImages << endl << endl;
+
+    // Main loop
+    cv::Mat im;
+    for (int i = 0; i < nImages; i++) {
+      im = frames[i];
+      double tframe = timestamps[i];
+
+      if (im.empty()) {
+	cerr << endl << "Failed to load frame #: " << i << endl;
+	return -1;
+      }
+
+      #ifdef COMPILEDWITHC11
+      chrono::steady_clock::time_point t1 = chrono::steady_clock::now();
+      #else
+      chrono::monotonic_clock::time_point t1 = chrono::monotonic_clock::now();
+      #endif
+
+      SLAM.TrackMonocular(im, tframe);
+
+      #ifdef COMPILEDWITHC11
+      chrono::steady_clock::time_point t2 = chrono::steady_clock::now();
+      #else
+      chrono::monotonic_clock::time_point t2 = chrono::monotonic_clock::now();
+      #endif
+
+      double ttrack = chrono::duration_cast<chrono::duration<double>> (t2 - t1).count();
+
+      vTimesTrack[i] = ttrack;
+
+      // Wait to load the next frame
+      double T = 0;
+      if (i < nImages - 1) {T = timestamps[i + 1] - tframe;}
+      else if (n > 0) {T = tframe - timestamps[i - 1];}
+    }
+
+    // Split shutdown between client and server
+    SLAM.ClientShutdown();
+
+    // Tracking time statistics
+    sort(VTimesTrack.begin(), vTimesTrack.end());
+    float totaltime = 0;
+    for (int i = 0; i < nImages; i++) {
+      totalTime += vTimesTrack[i];
+    }
+
+    cout << "--------" << endl << endl;
+    cout << "Median tracking time: " << vTimesTrack[nImages/2] << endl;
+    cout << "Mean tracking time: " << totaltime / nImages << endl;
+  }
+
+  else if (RunType.compare("server") == 0) {
+    // Create SLAM system
+    ORB_SLAM2::System SLAM(argv[1], argv[2], RunType, ORB_SLAM2::System::MONOCULAR, true);
+
+    // Stop all threads
+    SLAM.ServerShutdown();
+
+    // Save camera trajectory
+    SLAM.SaveKeyFrameTrajectoryTUM("KeyFrameTrajectory,txt");
+  }
+
+  else {
+    cerr << endl << "Client Usage: ./mono_anafi VOC_PATH SETTINGS_PATH VIDEO_PATH RUN_TYPE(client|server)" << endl;
+    cerr << endl << "Server Usage: ./mono_anafi VOC_PATH SETTINGS_PATH VIDEO_PATH RUN_TYPE(client|server)" << endl;
+    return -1;
   }
 
   return 0;
