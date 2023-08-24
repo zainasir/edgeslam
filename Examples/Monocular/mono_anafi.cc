@@ -94,22 +94,24 @@ int main(int argc, char **argv) {
       // Wait to load the next frame
       double T = 0;
       if (i < nImages - 1) {T = timestamps[i + 1] - tframe;}
-      else if (n > 0) {T = tframe - timestamps[i - 1];}
+      else if (i > 0) {T = tframe - timestamps[i - 1];}
+
+      if (ttrack < T) {usleep((T - ttrack) * 1e6);}
     }
 
     // Split shutdown between client and server
     SLAM.ClientShutdown();
 
     // Tracking time statistics
-    sort(VTimesTrack.begin(), vTimesTrack.end());
-    float totaltime = 0;
+    sort(vTimesTrack.begin(), vTimesTrack.end());
+    float totalTime = 0;
     for (int i = 0; i < nImages; i++) {
       totalTime += vTimesTrack[i];
     }
 
     cout << "--------" << endl << endl;
     cout << "Median tracking time: " << vTimesTrack[nImages/2] << endl;
-    cout << "Mean tracking time: " << totaltime / nImages << endl;
+    cout << "Mean tracking time: " << totalTime / nImages << endl;
   }
 
   else if (RunType.compare("server") == 0) {
