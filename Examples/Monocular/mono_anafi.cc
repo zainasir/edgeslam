@@ -3,6 +3,7 @@
 #include <fstream>
 #include <chrono>
 #include <opencv2/core/core.hpp>
+#include <opencv2/imgproc/imgproc.hpp>
 #include <System.h>
 #include <string>
 #include <vector>
@@ -39,9 +40,10 @@ int main(int argc, char **argv) {
 
     for (int i = 0; i < videoCap.get(CV_CAP_PROP_FRAME_COUNT); i++) {
       // Get frame
-      cv::Mat currFrame;
+      cv::Mat currFrame, grayFrame;
       videoCap >> currFrame;
-      frames.push_back(currFrame);
+      cv::cvtColor(currFrame, grayFrame, cv::COLOR_BGR2GRAY);
+      frames.push_back(grayFrame);
 
       // Get timestamp
       auto current_time = chrono::system_clock::now();
