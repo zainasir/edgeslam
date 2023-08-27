@@ -27,7 +27,7 @@ int main(int argc, char **argv) {
 
     // Open video file
     std::string videoPath = argv[4];
-    cv::VideoCapture videoCap(2);
+    cv::VideoCapture videoCap(videoPath);
 
     if (!videoCap.isOpened()) {
       cerr << endl << "Error opening video file!" << endl;
