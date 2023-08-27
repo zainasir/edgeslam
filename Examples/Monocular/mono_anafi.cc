@@ -38,7 +38,6 @@ int main(int argc, char **argv) {
     ORB_SLAM2::System SLAM(argv[1], argv[2], RunType, ORB_SLAM2::System::MONOCULAR, true);
     cout << endl << "--------" << endl;
     cout << "Start processing sequence ..." << endl;
-    cout << "Images in the sequence: " << nImages << endl << endl;
 
     #ifdef COMPILEDWITHC11
     chrono::steady_clock::time_point t1 = chrono::steady_clock::now();
