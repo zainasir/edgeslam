@@ -149,3 +149,11 @@ target_link_libraries(RGBD
 ${LIBS}
 )
 
+# Node for publishing RTSP stream
+rosbuild_add_executable(RTSP_Pub
+src/rtsp_pub.cc
+)
+
+target_link_libraries(RTSP_Pub
+${LIBS}
+)
