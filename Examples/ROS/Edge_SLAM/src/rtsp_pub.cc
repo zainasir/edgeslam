@@ -9,52 +9,6 @@
 
 int skipFrame = 3;
 std::string rtspPath = "rtsp://192.168.53.1/live";
-queue<cv::Mat> *frameQueue = new queue<cv::Mat>();
-
-void ReceiveFrame()
-{
-  cv::VideoCapture videoCap(rtspPath);
-
-  if (!videoCap.isOpened()) {
-    cerr << endl << "Failed to open RTSP stream!" << endl;
-    return;
-  }
-
-  cv::Mat frame;
-  int count = 0;
-  
-  while (true) {
-    videoCap >> frame;
-
-    if (frame.empty()) {
-      cerr << endl << "Empty frame received. Shutting down stream!" << endl;
-      return;
-    }
-
-    else {
-      cout << "Adding frame: " << count << ". Queue size: " << frameQueue -> size() << endl;
-      frameQueue -> push(frame);
-      count++;
-      //imshow("RTSP Stream", frame);
-    }
-
-    char interruptKey = (char) cv::waitKey(25);
-    if (interruptKey == 27) {
-      return;
-    }
-  }
-}
-
-void DisplayFrame()
-{
-  while (true) {
-    if (frameQueue -> size() > 0) {
-      cv::Mat currFrame = frameQueue -> front();
-      cout << "Displayed frame: " << currFrame.size() << endl;
-      frameQueue -> pop();
-    }
-  }
-}
 
 int main(int argc, char **argv)
 {
@@ -71,16 +25,6 @@ int main(int argc, char **argv)
   setenv("OPENCV_FFMPEG_CAPTURE_OPTIONS", "rtsp_transport;udp", 1);
   #endif
 
-  /*
-  std::thread receiveThread(ReceiveFrame);
-  std::thread displayThread(DisplayFrame);
-  receiveThread.join();
-  displayThread.join();
-
-  ros::shutdown();
-  return 1;
-  */
-  
   cv::VideoCapture videoCap(rtspPath);
 
   if (!videoCap.isOpened()) {
@@ -88,6 +32,9 @@ int main(int argc, char **argv)
     ros::shutdown();
     return 1;
   }
+
+  // Limit buffer size to avoid jittering
+  videoCap.set(cv::CAP_PROP_BUFFERSIZE, 10);
   
   image_transport::ImageTransport imageTransporter(nodeHandler);
   image_transport::Publisher pubFrame = imageTransporter.advertise("camera", 1);
@@ -107,7 +54,6 @@ int main(int argc, char **argv)
     }
 
     else if (frameCount++ % skipFrame == 0) {
-      cout << "Found frame: " << frameCount << endl;
       imageMsg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", frame).toImageMsg();
       pubFrame.publish(imageMsg);
       cv::waitKey(1);
