@@ -37,7 +37,7 @@ int main(int argc, char **argv)
   videoCap.set(cv::CAP_PROP_BUFFERSIZE, 10);
   
   image_transport::ImageTransport imageTransporter(nodeHandler);
-  image_transport::Publisher pubFrame = imageTransporter.advertise("camera", 1);
+  image_transport::Publisher pubFrame = imageTransporter.advertise("camera/image_raw", 1);
 
   cv::Mat frame;
   sensor_msgs::ImagePtr imageMsg;
