@@ -75,20 +75,21 @@ RUN apt install python-rosdep
 RUN rosdep init
 RUN rosdep update
 
-# Download RGB-D TUM Dataset for testing
+# Download TUM RGB-D Dataset for testing
 WORKDIR /home
 RUN cd edgeslam \
     && mkdir Datasets \
     && cd Datasets \
-    && wget https://cvg.cit.tum.de/rgbd/dataset/freiburg1/rgbd_dataset_freiburg1_xyz.tgz
-RUN cd /home/edgeslam/Datasets \
-    && tar -xzvf rgbd_dataset_freiburg1_xyz.tgz
+    && wget https://cvg.cit.tum.de/rgbd/dataset/freiburg1/rgbd_dataset_freiburg1_xyz.bag
 
 # Download additional scripts for testing
 RUN cd /home/edgeslam \
     && mkdir Scripts \
     && cd Scripts \
     && wget https://svncvpr.in.tum.de/cvpr-ros-pkg/trunk/rgbd_benchmark/rgbd_benchmark_tools/src/rgbd_benchmark_tools/associate.py
+
+# Install emacs for testing
+RUN apt-get install emacs
 
 # Entrypoint into edgeslam
 WORKDIR /home/edgeslam
