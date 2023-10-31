@@ -89,7 +89,7 @@ RUN cd /home/edgeslam \
     && wget https://svncvpr.in.tum.de/cvpr-ros-pkg/trunk/rgbd_benchmark/rgbd_benchmark_tools/src/rgbd_benchmark_tools/associate.py
 
 # Install emacs for testing
-RUN apt-get install emacs
+RUN apt-get install -y emacs
 
 # Entrypoint into edgeslam
 WORKDIR /home/edgeslam
