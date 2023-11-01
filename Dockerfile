@@ -27,7 +27,7 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
     ca-certificates
 
 # Set dependencies as environment variables
-ENV OPENCV_VERSION=3.4.2
+ENV OPENCV_VERSION=3.2.0
 ENV OPENCV_DIR=opencv-$OPENCV_VERSION
 ENV BOOST_VERSION=1.65.1
 ENV EIGEN_VERSION=3.3.4
@@ -80,7 +80,7 @@ WORKDIR /home
 RUN cd edgeslam \
     && mkdir Datasets \
     && cd Datasets \
-    && wget https://cvg.cit.tum.de/rgbd/dataset/freiburg1/rgbd_dataset_freiburg1_xyz.bag
+    && wget https://cvg.cit.tum.de/rgbd/dataset/freiburg2/rgbd_dataset_freiburg2_desk.bag
 
 # Download additional scripts for testing
 RUN cd /home/edgeslam \
@@ -90,6 +90,9 @@ RUN cd /home/edgeslam \
 
 # Install emacs for testing
 RUN apt-get install -y emacs
+
+# Set up ROS
+RUN echo "export ROS_PACKAGE_PATH=\${ROS_PACKAGE_PATH}:/home/edgeslam/Examples/ROS" >> ~/.bashrc
 
 # Entrypoint into edgeslam
 WORKDIR /home/edgeslam
