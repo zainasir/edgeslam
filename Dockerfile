@@ -24,10 +24,11 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
     libeigen3-dev \
     libboost-all-dev \
     lsb-release \
-    ca-certificates
+    ca-certificates \
+    emacs
 
 # Set dependencies as environment variables
-ENV OPENCV_VERSION=3.2.0
+ENV OPENCV_VERSION=3.4.2
 ENV OPENCV_DIR=opencv-$OPENCV_VERSION
 ENV BOOST_VERSION=1.65.1
 ENV EIGEN_VERSION=3.3.4
@@ -87,9 +88,6 @@ RUN cd /home/edgeslam \
     && mkdir Scripts \
     && cd Scripts \
     && wget https://svncvpr.in.tum.de/cvpr-ros-pkg/trunk/rgbd_benchmark/rgbd_benchmark_tools/src/rgbd_benchmark_tools/associate.py
-
-# Install emacs for testing
-RUN apt-get install -y emacs
 
 # Set up ROS
 RUN echo "export ROS_PACKAGE_PATH=\${ROS_PACKAGE_PATH}:/home/edgeslam/Examples/ROS" >> ~/.bashrc
