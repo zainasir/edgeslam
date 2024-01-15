@@ -212,7 +212,7 @@ This will create **libEdge_SLAM.so** at **lib** folder and the executables
   rosrun image_view image_view image:=/camera
   ```
 
-### Docker Setup
+### Nvidia Jetson AGX Xavier Setup
 * Build the docker container.
   ```
   sudo docker build -t edgeslam -f Dockerfile.jetson .
