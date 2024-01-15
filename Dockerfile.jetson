@@ -1,0 +1,87 @@
+FROM stereolabs/zed:4.0-tools-devel-jetson-jp4.6.1
+
+# Use bash to avoid sourcing errors later on
+SHELL ["/bin/bash", "-c"]
+
+ARG DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && \
+    apt-get upgrade -y && \
+    apt-get install -y -q --no-install-recommends \
+    build-essential \
+    cmake \
+    curl \
+    gcc \
+    git \
+    libglew-dev \
+    libgtk2.0-dev \
+    pkg-config \
+    ffmpeg \
+    libavformat-dev \
+    libavcodec-dev \
+    libswscale-dev \
+    python-dev \
+    python-numpy \
+    unzip \
+    wget \
+    libeigen3-dev \
+    libboost-all-dev \
+    lsb-release \
+    ca-certificates \
+    emacs \
+    gnupg
+
+ENV OPENCV_VERSION=3.4.2
+ENV OPENCV_DIR=opencv-$OPENCV_VERSION
+ENV BOOST_VERSION=1.65.1
+ENV EIGEN_VERSION=3.3.4
+
+WORKDIR /home
+
+# Pangolin
+RUN git clone --recursive https://github.com/stevenlovegrove/Pangolin.git -b v0.5 && \
+    cd Pangolin && \
+    mkdir build && \
+    cd build && \
+    cmake .. && \
+    make
+
+# OpenCV
+RUN wget -O opencv.zip https://github.com/opencv/opencv/archive/${OPENCV_VERSION}.zip \
+    && unzip opencv.zip \
+    && cd $OPENCV_DIR \
+    && mkdir release \
+    && cd release \
+    && cmake -D CMAKE_BUILD_TYPE=RELEASE -D CMAKE_INSTALL_PREFIX=/usr/local .. \
+    && make \
+    && make install
+
+# ROS Melodic
+WORKDIR ~/
+RUN ln -snf /usr/share/zoneinfo/$CONTAINER_TIMEZONE /etc/localtime && echo $CONTAINER_TIMEZONE > /etc/timezone && \
+    sh -c 'echo "deb http://packages.ros.org/ros/ubuntu $(lsb_release -sc) main" > /etc/apt/sources.list.d/ros-latest.list' && \
+    curl -s https://raw.githubusercontent.com/ros/rosdistro/master/ros.asc | apt-key add - && \
+    apt-get update && \
+    apt-get install -y -q ros-melodic-desktop-full && \
+    echo "source /opt/ros/melodic/setup.bash" >> ~/.bashrc && \
+    source ~/.bashrc && \
+    apt-get install -y -q python-rosdep && \
+    rosdep init && \
+    rosdep update
+
+# Set up simlinks for Eigen3
+RUN ln -s /usr/include/eigen3/Eigen /usr/local/include/Eigen
+
+# Set up ROS
+RUN echo "export ROS_PACKAGE_PATH=\${ROS_PACKAGE_PATH}:/home/edgeslam/Examples/ROS" >> ~/.bashrc
+
+# Edge-SLAM
+WORKDIR /home
+RUN git clone -b docker --single-branch https://github.com/zainasir/edgeslam.git \
+    && cd edgeslam \
+    && chmod +x build.sh \
+    && ./build.sh
+
+# Copy dataset for testing purposes
+COPY rgbd_dataset_freiburg2_desk.bag /home/edgeslam/Datasets/
+
+CMD ["/bin/bash"]

@@ -187,7 +187,7 @@ This will create **libEdge_SLAM.so** at **lib** folder and the executables
 ### Docker Setup
 * Build the docker container.
   ```
-  sudo docker build -t edgeslam .
+  sudo docker build -t edgeslam -f Dockefile .
   ```
 * On the mobile device, disable access control to allow for X11 server connections.
   ```
@@ -210,4 +210,18 @@ This will create **libEdge_SLAM.so** at **lib** folder and the executables
   ```
   sudo docker exec -it <container_id> bash
   rosrun image_view image_view image:=/camera
+  ```
+
+### Docker Setup
+* Build the docker container.
+  ```
+  sudo docker build -t edgeslam -f Dockerfile.jetson .
+  ```
+* On the mobile device, disable access control to allow for X11 server connections.
+  ```
+  xhost +
+  ```
+* Start the mobile container.
+  ```
+  sudo docker run -it --rm -e DISPLAY=$DISPLAY --runtime nvidia --net=host --privileged -v /tmp/.X11-unix:/tmp/.X11-unix edgeslam
   ```

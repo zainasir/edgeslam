@@ -103,6 +103,8 @@ endif()
 find_package(Eigen3 3.1.0 REQUIRED)
 find_package(Pangolin REQUIRED)
 find_package(Boost COMPONENTS system serialization filesystem REQUIRED)
+find_package(ZED 3 REQUIRED)
+find_package(CUDA ${ZED_CUDA_VERSION} REQUIRED)
 
 include_directories(
 ${PROJECT_SOURCE_DIR}
@@ -110,6 +112,8 @@ ${PROJECT_SOURCE_DIR}/../../../
 ${PROJECT_SOURCE_DIR}/../../../include
 ${Pangolin_INCLUDE_DIRS}
 ${Boost_INCLUDE_DIRS}
+${CUDA_INCLUDE_DIRS}
+${ZED_INCLUDE_DIRS}
 )
 
 set(LIBS
@@ -120,6 +124,9 @@ ${Boost_LIBRARIES}
 ${PROJECT_SOURCE_DIR}/../../../Thirdparty/DBoW2/lib/libDBoW2.so
 ${PROJECT_SOURCE_DIR}/../../../Thirdparty/g2o/lib/libg2o.so
 ${PROJECT_SOURCE_DIR}/../../../lib/libEdge_SLAM.so
+${ZED_LIBRARIES}
+${CUDA_CUDA_LIBRARY}
+${CUDA_CUDART_LIBARY}
 )
 
 # Node for monocular camera
@@ -149,11 +156,11 @@ target_link_libraries(RGBD
 ${LIBS}
 )
 
-# Node for publishing RTSP stream
-rosbuild_add_executable(RTSP_Pub
-src/rtsp_pub.cc
+# Node for publishing ZED depth stream
+rosbuild_add_executable(ZED
+src/ros_zed.cc
 )
 
-target_link_libraries(RTSP_Pub
+target_link_libraries(ZED
 ${LIBS}
 )
