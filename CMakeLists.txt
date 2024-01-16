@@ -123,7 +123,3 @@ target_link_libraries(mono_kitti ${PROJECT_NAME})
 add_executable(mono_euroc
 Examples/Monocular/mono_euroc.cc)
 target_link_libraries(mono_euroc ${PROJECT_NAME})
-
-add_executable(mono_anafi
-Examples/Monocular/mono_anafi.cc)
-target_link_libraries(mono_anafi ${PROJECT_NAME})
