@@ -217,11 +217,16 @@ This will create **libEdge_SLAM.so** at **lib** folder and the executables
   ```
   sudo docker build -t edgeslam -f Dockerfile.jetson .
   ```
-* On the mobile device, disable access control to allow for X11 server connections.
+* Disable access control to allow for X11 server connections.
   ```
   xhost +
   ```
-* Start the mobile container.
+* Start the container.
   ```
   sudo docker run -it --rm -e DISPLAY=$DISPLAY --runtime nvidia --net=host --privileged -v /tmp/.X11-unix:/tmp/.X11-unix edgeslam
   ```
+* Run the container setup script
+  ```
+  . /home/container_setup.sh
+  ```
+  

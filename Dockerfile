@@ -89,7 +89,6 @@ RUN cd /home/edgeslam \
     && cd Scripts \
     && wget https://svncvpr.in.tum.de/cvpr-ros-pkg/trunk/rgbd_benchmark/rgbd_benchmark_tools/src/rgbd_benchmark_tools/associate.py
 
-# Set up ROS
 RUN echo "export ROS_PACKAGE_PATH=\${ROS_PACKAGE_PATH}:/home/edgeslam/Examples/ROS" >> ~/.bashrc
 
 # Entrypoint into edgeslam

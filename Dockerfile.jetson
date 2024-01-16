@@ -28,7 +28,8 @@ RUN apt-get update && \
     lsb-release \
     ca-certificates \
     emacs \
-    gnupg
+    gnupg \
+    && rm -rf /var/lib/apt/lists/*
 
 ENV OPENCV_VERSION=3.4.2
 ENV OPENCV_DIR=opencv-$OPENCV_VERSION
@@ -68,11 +69,21 @@ RUN ln -snf /usr/share/zoneinfo/$CONTAINER_TIMEZONE /etc/localtime && echo $CONT
     rosdep init && \
     rosdep update
 
+# Set up ROS catkin ws
+RUN echo "source /opt/ros/melodic/setup.bash" >> ~/.bashrc
+RUN /bin/bash -c '. /opt/ros/melodic/setup.bash &&\
+    mkdir -p /home/catkin_ws/src &&\
+    cd /home/catkin_ws &&\
+    catkin_make'
+RUN echo "source /home/catkin_ws/devel/setup.bash" >> ~/.bashrc
+
+# Download ZED Ros wrapper
+WORKDIR /home/catkin_ws
+RUN cd src && \
+    git clone --recursive https://github.com/stereolabs/zed-ros-wrapper.git
+
 # Set up simlinks for Eigen3
 RUN ln -s /usr/include/eigen3/Eigen /usr/local/include/Eigen
-
-# Set up ROS
-RUN echo "export ROS_PACKAGE_PATH=\${ROS_PACKAGE_PATH}:/home/edgeslam/Examples/ROS" >> ~/.bashrc
 
 # Edge-SLAM
 WORKDIR /home
@@ -84,4 +95,8 @@ RUN git clone -b docker --single-branch https://github.com/zainasir/edgeslam.git
 # Copy dataset for testing purposes
 COPY rgbd_dataset_freiburg2_desk.bag /home/edgeslam/Datasets/
 
+# Copy container setup script
+COPY container_setup.sh /home/
+
+WORKDIR /home/edgeslam
 CMD ["/bin/bash"]
