@@ -95,8 +95,10 @@ RUN git clone -b docker --single-branch https://github.com/zainasir/edgeslam.git
 # Copy dataset for testing purposes
 COPY rgbd_dataset_freiburg2_desk.bag /home/edgeslam/Datasets/
 
+RUN echo hello
+
 # Copy container setup script
 COPY container_setup.sh /home/
 
-WORKDIR /home/edgeslam
+WORKDIR /home
 CMD ["/bin/bash"]

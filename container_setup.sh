@@ -7,6 +7,6 @@ catkin_make -DCMAKE_BUILD_TYPE=Release
 source ./devel/setup.bash
 
 # Build edgeslam
-export ROS_PACKAGE_PATH=${ROS_PACKAGE_PATH}:/home/edgeslam/Examples/ROS
+echo "export ROS_PACKAGE_PATH=\${ROS_PACKAGE_PATH}:/home/edgeslam/Examples/ROS" >> ~/.bashrc
 cd /home/edgeslam
 ./build_ros.sh

@@ -227,6 +227,7 @@ This will create **libEdge_SLAM.so** at **lib** folder and the executables
   ```
 * Run the container setup script
   ```
-  . /home/container_setup.sh
+  chmod +x container_setup.sh
+  .container_setup.sh
   ```
   
