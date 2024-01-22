@@ -77,10 +77,14 @@ RUN /bin/bash -c '. /opt/ros/melodic/setup.bash &&\
     catkin_make'
 RUN echo "source /home/catkin_ws/devel/setup.bash" >> ~/.bashrc
 
-# Download ZED Ros wrapper
+# ZED Ros wrapper
 WORKDIR /home/catkin_ws
 RUN cd src && \
     git clone --recursive https://github.com/stereolabs/zed-ros-wrapper.git
+RUN rosdep install --from-paths src --ignore-src -r -y
+RUN /bin/bash -c '. /opt/ros/melodic/setup.sh && \
+    catkin_make -DCMAKE_BUILD_TYPE=Release -DCMAKE_LIBRARY_PATH=/usr/local/cuda/lib64/stubs -DCUDA_CUDART_LIBRARY=/usr/local/cuda/lib64/stubs -DCMAKE_CXX_FLAGS="-Wl,--allow-shlib-undefined" && \
+    source ./devel/setup.bash'
 
 # Set up simlinks for Eigen3
 RUN ln -s /usr/include/eigen3/Eigen /usr/local/include/Eigen
@@ -95,10 +99,7 @@ RUN git clone -b docker --single-branch https://github.com/zainasir/edgeslam.git
 # Copy dataset for testing purposes
 COPY rgbd_dataset_freiburg2_desk.bag /home/edgeslam/Datasets/
 
-RUN echo hello
-
-# Copy container setup script
-COPY container_setup.sh /home/
+RUN echo "export ROS_PACKAGE_PATH=\${ROS_PACKAGE_PATH}:/home/edgeslam/Examples/ROS" >> ~/.bashrc
 
 WORKDIR /home
 CMD ["/bin/bash"]

@@ -193,23 +193,14 @@ This will create **libEdge_SLAM.so** at **lib** folder and the executables
   ```
   xhost +
   ```
-* Start the mobile container.
+* Start the container.
   ```
   sudo docker run -it --rm -e DISPLAY=$DISPLAY -v /tmp/.X11-unix:/tmp/.X11-unix edgeslam
   ```
-* Start roscore.
+* Build ros nodes for edgeslam inside the container.
   ```
-  roscore
-  ```
-* Open another terminal in the same docker container to publish the rtsp stream.
-  ```
-  sudo docker exec -it <container_id> bash
-  rosrun Edge_SLAM RTSP_Pub
-  ```
-* Open another terminal in the same docker container to view the rtsp stream.
-  ```
-  sudo docker exec -it <container_id> bash
-  rosrun image_view image_view image:=/camera
+  cd /home/edgeslam
+  ./build_ros.sh
   ```
 
 ### Nvidia Jetson AGX Xavier Setup
@@ -225,9 +216,8 @@ This will create **libEdge_SLAM.so** at **lib** folder and the executables
   ```
   sudo docker run -it --rm -e DISPLAY=$DISPLAY --runtime nvidia --net=host --privileged -v /tmp/.X11-unix:/tmp/.X11-unix edgeslam
   ```
-* Run the container setup script
+* Build ros nodes for edgeslam inside the container.
   ```
-  chmod +x container_setup.sh
-  .container_setup.sh
+  cd /home/edgeslam
+  ./build_ros.sh
   ```
-  
