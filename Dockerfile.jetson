@@ -99,6 +99,9 @@ RUN git clone -b docker --single-branch https://github.com/zainasir/edgeslam.git
 # Copy dataset for testing purposes
 COPY rgbd_dataset_freiburg2_desk.bag /home/edgeslam/Datasets/
 
+# Copy zed2 calibration file
+COPY SN29105317.conf /usr/local/zed/settings/
+
 RUN echo "export ROS_PACKAGE_PATH=\${ROS_PACKAGE_PATH}:/home/edgeslam/Examples/ROS" >> ~/.bashrc
 
 WORKDIR /home
