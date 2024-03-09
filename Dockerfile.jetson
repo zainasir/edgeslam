@@ -28,8 +28,7 @@ RUN apt-get update && \
     lsb-release \
     ca-certificates \
     emacs \
-    gnupg \
-    && rm -rf /var/lib/apt/lists/*
+    gnupg
 
 ENV OPENCV_VERSION=3.4.2
 ENV OPENCV_DIR=opencv-$OPENCV_VERSION
@@ -95,9 +94,6 @@ RUN git clone -b docker --single-branch https://github.com/zainasir/edgeslam.git
     && cd edgeslam \
     && chmod +x build.sh \
     && ./build.sh
-
-# Copy dataset for testing purposes
-COPY rgbd_dataset_freiburg2_desk.bag /home/edgeslam/Datasets/
 
 # Copy zed2 calibration file
 COPY SN29105317.conf /usr/local/zed/settings/
