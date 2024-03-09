@@ -58,7 +58,7 @@ int main(int argc, char **argv)
     std::transform(RunType.begin(), RunType.end(), RunType.begin(), ::tolower);
     ros::init(argc, argv, RunType);
     ros::start();
-    if((argc != 4) || ((RunType.compare("client") != 0) && (RunType.compare("server") != 0)))
+    if((argc < 4) || ((RunType.compare("client") != 0) && (RunType.compare("server") != 0)))
     {
         cerr << endl << "Usage: rosrun Edge_SLAM RGBD VOC_PATH SETTINGS_PATH RUN_TYPE(client|server)" << endl;
         ros::shutdown();
