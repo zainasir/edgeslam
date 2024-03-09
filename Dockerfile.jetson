@@ -28,7 +28,8 @@ RUN apt-get update && \
     lsb-release \
     ca-certificates \
     emacs \
-    gnupg
+    gnupg \
+    iperf3
 
 ENV OPENCV_VERSION=3.4.2
 ENV OPENCV_DIR=opencv-$OPENCV_VERSION

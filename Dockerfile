@@ -25,7 +25,8 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
     libboost-all-dev \
     lsb-release \
     ca-certificates \
-    emacs
+    emacs \
+    iperf3
 
 # Set dependencies as environment variables
 ENV OPENCV_VERSION=3.4.2
