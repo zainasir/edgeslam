@@ -33,16 +33,18 @@ class NetworkProfiler
 {
 public:
   NetworkProfiler();
-  void startServer(string args);
-  void startClient(string ip, int t_secs);
+  void startServer(std::string args);
+  void startClient(std::string ip, int t_secs);
   void stopClient();
   
 protected:
-  string outputFileName;
+  std::string outputFileName;
   bool killClient;
-  thread* clientThread;
-  vector<string> timestamps;
-  vector<string> bandwidths;
+  std::thread* clientThread;
+  std::vector<std::string> timestamps;
+  std::vector<std::string> bandwidths;
+
+  void clientWorker(std::string ip, int t_secs);
 };
 
 } //namespace ORB_SLAM

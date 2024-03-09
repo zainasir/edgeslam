@@ -33,6 +33,7 @@
 #include <opencv2/core/core.hpp>
 
 #include"../../../include/System.h"
+#include"../../../include/NetworkProfiler.h"
 
 // Edge-SLAM
 #include <string>
@@ -68,9 +69,24 @@ int main(int argc, char **argv)
     // Create SLAM system. It initializes all system threads and gets ready to process frames.
     ORB_SLAM2::System SLAM(argv[1],argv[2],RunType,ORB_SLAM2::System::RGBD,true);
 
+    // Create network profiler system
+    ORB_SLAM2::NetworkProfiler NProf;
+
+    if (RunType.compare("server") == 0 && (argc == 5))
+    {
+      NProf.startServer("");
+    }
+    
     // Edge-SLAM: check client or server
     if (RunType.compare("client") == 0)
     {
+
+        if (argc == 5)
+	{
+	  std::string serverIP(argv[4]);
+	  NProf.startClient(serverIP, 100);
+	}
+      
         ImageGrabber igb(&SLAM);
 
         ros::NodeHandle nh;
@@ -101,6 +117,9 @@ int main(int argc, char **argv)
 
 	// Save map points
 	SLAM.SaveMapPoints("MapPoints.txt");
+
+	// Shut down network profiler and save bandwidth data
+	NProf.stopClient();
     }
 
     ros::shutdown();

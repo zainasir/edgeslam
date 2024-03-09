@@ -22,6 +22,10 @@
 
 #include <iostream>
 #include <fstream>
+#include <thread>
+#include <vector>
+#include <string>
+#include <unistd.h>
 
 namespace ORB_SLAM2
 {
@@ -32,36 +36,37 @@ NetworkProfiler::NetworkProfiler()
   killClient = false;
 }
 
-void NetworkProfiler::startServer(string args)
+void NetworkProfiler::startServer(std::string args)
 {
-  string cmd = "iperf3 -s -D " + args;
+  std::string cmd = "iperf3 -s -D " + args;
   system(cmd.c_str());
 }
 
-void NetworkProfiler::startClient(string ip, int t_secs) {
-  clientThread = new thread(&NetworkProfiler::clientWorker, this, ip, t_secs);
+void NetworkProfiler::startClient(std::string ip, int t_secs) {
+  clientThread = new std::thread(&NetworkProfiler::clientWorker, this, ip, t_secs);
 }
 
-void NetworkProfiler::stopClient() {
+void NetworkProfiler::stopClient()
+{
   killClient = true;
   clientThread -> join();
 
-  ofstream outputFile;
-  outputFile.open(outputFileName, ofstream::out | ofstream::trunc);
+  std::ofstream outputFile;
+  outputFile.open(outputFileName, std::ofstream::out | std::ofstream::trunc);
 
   for (int i = 0; i < timestamps.size(); i++) {
-    outputFile << timestamps[i] << " " << bandwidths[i] << endl;
+    outputFile << timestamps[i] << " " << bandwidths[i] << std::endl;
   }
 
   outputFile.close();
 }
 
-void clientWorker(string ip, int t_secs) {
-  ofstream tempfile;
-  tempfile.open("temp.txt", ofstream::out | ofstream::trunc);
+void NetworkProfiler::clientWorker(std::string ip, int t_secs) {
+  std::ofstream tempfile;
+  tempfile.open("temp.txt", std::ofstream::out | std::ofstream::trunc);
   tempfile.close();
 
-  string cmd = "iperf3 -c " + ip + " --format k --timestamps=\"&s \" --logfile temp.txt --time " + to_string(t_secs) + " &";
+  std::string cmd = "iperf3 -c " + ip + " --format k --timestamps=\"&s \" --logfile temp.txt --time " + std::to_string(t_secs) + " &";
   system(cmd.c_str());
 
   sleep(3);
@@ -69,10 +74,10 @@ void clientWorker(string ip, int t_secs) {
   for (int t = 0; t < t_secs; t++) {
     if (killClient) {return;}
 
-    ifstream logFile("temp.txt");
-    string currLine;
-    string timestamp;
-    string bandwidth;
+    std::ifstream logFile("temp.txt");
+    std::string currLine;
+    std::string timestamp;
+    std::string bandwidth;
 
     if (logFile.is_open()) {
       for (int i = 0; i < 3; i++) {

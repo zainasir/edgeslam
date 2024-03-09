@@ -73,6 +73,7 @@ src/MapPoint.cc
 src/KeyFrame.cc
 src/Map.cc
 src/MapDrawer.cc
+src/NetworkProfiler.cc
 src/Optimizer.cc
 src/PnPsolver.cc
 src/Frame.cc
