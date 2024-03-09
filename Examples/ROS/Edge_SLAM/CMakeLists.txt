@@ -126,18 +126,19 @@ if(ZED)
 	)
 endif(ZED)
 
-set(LIBS
-${OpenCV_LIBS}
-${EIGEN3_LIBS}
-${Pangolin_LIBRARIES}
-${Boost_LIBRARIES}
-${PROJECT_SOURCE_DIR}/../../../Thirdparty/DBoW2/lib/libDBoW2.so
-${PROJECT_SOURCE_DIR}/../../../Thirdparty/g2o/lib/libg2o.so
-${PROJECT_SOURCE_DIR}/../../../lib/libEdge_SLAM.so
-${ZED_LIBRARIES}
-${CUDA_CUDA_LIBRARY}
-${CUDA_CUDART_LIBARY}
-)
+if(ZED)
+	set(LIBS
+	${OpenCV_LIBS}
+	${EIGEN3_LIBS}
+	${Pangolin_LIBRARIES}
+	${Boost_LIBRARIES}
+	${PROJECT_SOURCE_DIR}/../../../Thirdparty/DBoW2/lib/libDBoW2.so
+	${PROJECT_SOURCE_DIR}/../../../Thirdparty/g2o/lib/libg2o.so
+	${PROJECT_SOURCE_DIR}/../../../lib/libEdge_SLAM.so
+	${ZED_LIBRARIES}
+	${CUDA_CUDA_LIBRARY}
+	${CUDA_CUDART_LIBARY}
+	)
 else()
 	set(LIBS
 	${OpenCV_LIBS}
