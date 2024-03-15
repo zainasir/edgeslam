@@ -72,19 +72,13 @@ int main(int argc, char **argv)
     // Create network profiler system
     ORB_SLAM2::NetworkProfiler NProf;
 
-    if (RunType.compare("server") == 0 && (argc == 5))
-    {
-      NProf.startServer("");
-    }
-    
     // Edge-SLAM: check client or server
     if (RunType.compare("client") == 0)
     {
 
         if (argc == 5)
 	{
-	  std::string serverIP(argv[4]);
-	  NProf.startClient(serverIP, 100);
+	  NProf.startServer("");
 	}
       
         ImageGrabber igb(&SLAM);
@@ -106,6 +100,12 @@ int main(int argc, char **argv)
     }
     else
     {
+        if (argc == 5)
+	{
+	  std::string serverIP(argv[4]);
+	  NProf.startClient(serverIP, 100);
+	}
+
         ros::spin();
 
         // Edge-SLAM: split shutdown between client and server
@@ -119,7 +119,10 @@ int main(int argc, char **argv)
 	SLAM.SaveMapPoints("MapPoints.txt");
 
 	// Shut down network profiler and save bandwidth data
-	NProf.stopClient();
+	if (argc == 5)
+	{
+	  NProf.stopClient();
+	}
     }
 
     ros::shutdown();

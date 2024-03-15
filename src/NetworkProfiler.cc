@@ -66,7 +66,7 @@ void NetworkProfiler::clientWorker(std::string ip, int t_secs) {
   tempfile.open("temp.txt", std::ofstream::out | std::ofstream::trunc);
   tempfile.close();
 
-  std::string cmd = "iperf3 -c " + ip + " --format k --timestamps=\"&s \" --logfile temp.txt --time " + std::to_string(t_secs) + " &";
+  std::string cmd = "iperf3 -c " + ip + " --format k --timestamps=\"%s \" --logfile temp.txt --time " + std::to_string(t_secs) + " &";
   system(cmd.c_str());
 
   sleep(3);
