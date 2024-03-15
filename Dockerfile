@@ -25,8 +25,7 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
     libboost-all-dev \
     lsb-release \
     ca-certificates \
-    emacs \
-    iperf3
+    emacs
 
 # Set dependencies as environment variables
 ENV OPENCV_VERSION=3.4.2
@@ -89,6 +88,15 @@ RUN cd /home/edgeslam \
     && mkdir Scripts \
     && cd Scripts \
     && wget https://svncvpr.in.tum.de/cvpr-ros-pkg/trunk/rgbd_benchmark/rgbd_benchmark_tools/src/rgbd_benchmark_tools/associate.py
+
+# Install iperf3.9
+WORKDIR /home
+RUN wget https://downloads.es.net/pub/iperf/iperf-3.9.tar.gz \
+    && tar -xvf iperf-3.9.tar.gz \
+    && cd iperf-3.9 \
+    && ./configure \
+    && sudo make \
+    && sudo make install
 
 RUN echo "export ROS_PACKAGE_PATH=\${ROS_PACKAGE_PATH}:/home/edgeslam/Examples/ROS" >> ~/.bashrc
 

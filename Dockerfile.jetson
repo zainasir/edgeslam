@@ -28,8 +28,7 @@ RUN apt-get update && \
     lsb-release \
     ca-certificates \
     emacs \
-    gnupg \
-    iperf3
+    gnupg
 
 ENV OPENCV_VERSION=3.4.2
 ENV OPENCV_DIR=opencv-$OPENCV_VERSION
@@ -88,6 +87,15 @@ RUN /bin/bash -c '. /opt/ros/melodic/setup.sh && \
 
 # Set up simlinks for Eigen3
 RUN ln -s /usr/include/eigen3/Eigen /usr/local/include/Eigen
+
+# Install iperf3.9
+WORKDIR /home
+RUN wget https://downloads.es.net/pub/iperf/iperf-3.9.tar.gz \
+    && tar -xvf iperf-3.9.tar.gz \
+    && cd iperf-3.9 \
+    && ./configure \
+    && sudo make \
+    && sudo make install
 
 # Edge-SLAM
 WORKDIR /home
