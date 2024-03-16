@@ -99,7 +99,7 @@ int main(int argc, char **argv)
         // Stop all threads
 	if (argc == 5)
 	{
-	  Nprof.stopClient();
+	  NProf.stopClient();
 	}
 	
         SLAM.ClientShutdown();
