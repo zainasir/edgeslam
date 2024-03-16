@@ -78,7 +78,8 @@ int main(int argc, char **argv)
 
         if (argc == 5)
 	{
-	  NProf.startServer("");
+	  std::string serverIP(argv[4]);
+	  NProf.startClient(serverIP, 100);
 	}
       
         ImageGrabber igb(&SLAM);
@@ -96,14 +97,18 @@ int main(int argc, char **argv)
 
         // Edge-SLAM: split shutdown between client and server
         // Stop all threads
+	if (argc == 5)
+	{
+	  Nprof.stopClient();
+	}
+	
         SLAM.ClientShutdown();
     }
     else
     {
         if (argc == 5)
 	{
-	  std::string serverIP(argv[4]);
-	  NProf.startClient(serverIP, 100);
+	  NProf.startServer("");
 	}
 
         ros::spin();
