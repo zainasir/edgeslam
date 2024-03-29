@@ -85,6 +85,9 @@ RUN wget https://downloads.es.net/pub/iperf/iperf-3.9.tar.gz \
     && sudo make \
     && sudo make install
 
+# NOTE: THIS IS A HACK. Removing this line leads to missing library issues for iperf3.
+RUN apt-get install -y iperf3
+
 RUN echo "export ROS_PACKAGE_PATH=\${ROS_PACKAGE_PATH}:/home/edgeslam/Examples/ROS" >> ~/.bashrc
 
 # Entrypoint into edgeslam
