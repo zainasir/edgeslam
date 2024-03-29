@@ -1,8 +1,5 @@
 cmake_minimum_required(VERSION 2.8.3)
 
-# Include ZED libs only when ZED is required
-option(ZED "Include ZED libraries" OFF)
-
 # Edge-SLAM: replaced next include statement with the content of rosbuild.cmake
 # and made edits as indicated below to prevent cmake deprecated policy warnings
 #include($ENV{ROS_ROOT}/core/rosbuild/rosbuild.cmake)
@@ -106,11 +103,6 @@ find_package(Eigen3 3.1.0 REQUIRED)
 find_package(Pangolin REQUIRED)
 find_package(Boost COMPONENTS system serialization filesystem REQUIRED)
 
-if(ZED)
-   find_package(ZED 3 REQUIRED)
-   find_package(CUDA ${ZED_CUDA_VERSION} REQUIRED)
-endif(ZED)
-
 include_directories(
 ${PROJECT_SOURCE_DIR}
 ${PROJECT_SOURCE_DIR}/../../../
@@ -119,37 +111,15 @@ ${Pangolin_INCLUDE_DIRS}
 ${Boost_INCLUDE_DIRS}
 )
 
-if(ZED)
-	include_directories(
-	${CUDA_INCLUDE_DIRS}
-	${ZED_INCLUDE_DIRS}
-	)
-endif(ZED)
-
-if(ZED)
-	set(LIBS
-	${OpenCV_LIBS}
-	${EIGEN3_LIBS}
-	${Pangolin_LIBRARIES}
-	${Boost_LIBRARIES}
-	${PROJECT_SOURCE_DIR}/../../../Thirdparty/DBoW2/lib/libDBoW2.so
-	${PROJECT_SOURCE_DIR}/../../../Thirdparty/g2o/lib/libg2o.so
-	${PROJECT_SOURCE_DIR}/../../../lib/libEdge_SLAM.so
-	${ZED_LIBRARIES}
-	${CUDA_CUDA_LIBRARY}
-	${CUDA_CUDART_LIBARY}
-	)
-else()
-	set(LIBS
-	${OpenCV_LIBS}
-	${EIGEN3_LIBS}
-	${Pangolin_LIBRARIES}
-	${Boost_LIBRARIES}
-	${PROJECT_SOURCE_DIR}/../../../Thirdparty/DBoW2/lib/libDBoW2.so
-	${PROJECT_SOURCE_DIR}/../../../Thirdparty/g2o/lib/libg2o.so
-	${PROJECT_SOURCE_DIR}/../../../lib/libEdge_SLAM.so
-	)
-endif(ZED)
+set(LIBS
+${OpenCV_LIBS}
+${EIGEN3_LIBS}
+${Pangolin_LIBRARIES}
+${Boost_LIBRARIES}
+${PROJECT_SOURCE_DIR}/../../../Thirdparty/DBoW2/lib/libDBoW2.so
+${PROJECT_SOURCE_DIR}/../../../Thirdparty/g2o/lib/libg2o.so
+${PROJECT_SOURCE_DIR}/../../../lib/libEdge_SLAM.so
+)
 
 
 # Node for monocular camera
