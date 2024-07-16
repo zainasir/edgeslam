@@ -195,7 +195,7 @@ This will create **libEdge_SLAM.so** at **lib** folder and the executables
   ```
 * Start the container.
   ```
-  sudo docker run -it --rm -e DISPLAY=$DISPLAY -v /tmp/.X11-unix:/tmp/.X11-unix edgeslam
+  sudo docker run -it --rm --net=host -e DISPLAY=$DISPLAY -v /tmp/.X11-unix:/tmp/.X11-unix edgeslam
   ```
 * Build ros nodes for edgeslam inside the container.
   ```
@@ -221,3 +221,9 @@ This will create **libEdge_SLAM.so** at **lib** folder and the executables
   cd /home/edgeslam
   ./build_ros.sh
   ```
+
+### Saving data locally
+Edge-SLAM saves two files, KeyFrameTrajectory.txt and MapPoints.txt in the container at /home/edgeslam. To save them on the host machine, either mount a volume to the container or copy using:
+```
+sudo docker cp <container-id>:/home/edgeslam/MapPoints.txt /host/path/MapPoints.txt
+```
