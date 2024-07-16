@@ -222,6 +222,17 @@ This will create **libEdge_SLAM.so** at **lib** folder and the executables
   ./build_ros.sh
   ```
 
+### Network Analysis using iPerf (Optional)
+You can analyse bandwidth between mobile and edge server using iperf3.
+* Start the iperf3 server on edge
+  ```
+  iperf3 -s --format K --timestamps="%s " --interval 1
+  ```
+* Start the iperf3 client on mobile
+  ```
+  iperf3 -c <edge-ip-address> --time 86400
+  ```
+
 ### Saving data locally
 Edge-SLAM saves two files, KeyFrameTrajectory.txt and MapPoints.txt in the container at /home/edgeslam. To save them on the host machine, either mount a volume to the container or copy using:
 ```
