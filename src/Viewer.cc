@@ -22,7 +22,6 @@
 #include <pangolin/pangolin.h>
 
 #include <mutex>
-#include <string>
 
 namespace ORB_SLAM2
 {
@@ -137,7 +136,7 @@ void Viewer::Run()
 
 	// Save pangolin frame as png
 	std::string pangFrame = std::to_string(frameCount);
-	pangFrame += "_pangolin_frame";
+	pangFrame = std::string("./frames/") + pangFrame + "_pangolin_frame";
 	d_cam.SaveOnRender(pangFrame);
 	
         pangolin::FinishFrame();
@@ -148,10 +147,10 @@ void Viewer::Run()
 
 	// Save opencv frame as png
 	std::string cvFrame = std::to_string(frameCount);
-	cvFrame += "_cv_frame.png";
+	cvFrame = std::string("./frames/") + cvFrame + "_cv_frame.png";
 	cv::imwrite(cvFrame, im);
 
-	count++;
+	frameCount++;
 
         if(menuReset)
         {
